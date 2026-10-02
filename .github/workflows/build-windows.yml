@@ -1,0 +1,100 @@
+name: Build Windows packages
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: Go — test and build Windows EXE
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mssql-monitor-go
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: mssql-monitor-go/go.mod
+          cache-dependency-path: mssql-monitor-go/go.sum
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Run static checks and tests
+        run: |
+          go vet ./...
+          go test ./...
+
+      - name: Build GUI and CLI binaries
+        run: |
+          mkdir -p ../artifacts/go
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -H windowsgui" -o ../artifacts/go/MSSQLMonitor.exe .
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o ../artifacts/go/MSSQLMonitorCLI.exe .
+
+      - name: Upload Go Windows binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: mssql-monitor-go-windows
+          path: artifacts/go/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  python:
+    name: Python — test and build Windows EXE
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: mssql-monitor
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: mssql-monitor/requirements.txt
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+
+      - name: Validate Python source and demo report
+        shell: pwsh
+        run: |
+          python -m py_compile app.py analysis.py checks.py db.py demo.py monitor.py report.py storage.py
+          $demoReport = Join-Path $env:RUNNER_TEMP 'mssql-monitor-demo-report.html'
+          python app.py --demo-report $demoReport
+          if (-not (Test-Path $demoReport)) { throw 'Demo report was not created.' }
+
+      - name: Build GUI and CLI binaries
+        shell: pwsh
+        run: |
+          $output = Join-Path $env:GITHUB_WORKSPACE 'artifacts\python'
+          $work = Join-Path $env:RUNNER_TEMP 'pyinstaller-work'
+          $spec = Join-Path $env:RUNNER_TEMP 'pyinstaller-spec'
+          New-Item -ItemType Directory -Force -Path $output, $work, $spec | Out-Null
+          python -m PyInstaller --clean --noconfirm --onefile --windowed --name MSSQLMonitor --icon icon.ico --collect-all pymssql --distpath $output --workpath $work --specpath $spec app.py
+          python -m PyInstaller --clean --noconfirm --onefile --console --name MSSQLMonitorCLI --icon icon.ico --collect-all pymssql --distpath $output --workpath $work --specpath $spec app.py
+
+      - name: Upload Python Windows binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: mssql-monitor-python-windows
+          path: artifacts/python/*.exe
+          if-no-files-found: error
+          retention-days: 14

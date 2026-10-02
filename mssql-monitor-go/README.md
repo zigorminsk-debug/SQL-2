@@ -95,6 +95,15 @@ GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath \
 -o rsrc_windows_amd64.syso` (файл `.syso` подхватывается сборкой Windows
 автоматически).
 
+## Автоматические сборки GitHub Actions
+
+Workflow [`.github/workflows/build-windows.yml`](../.github/workflows/build-windows.yml)
+запускается автоматически при каждом `push` и `pull request`; его также можно запустить вручную
+во вкладке **Actions → Build Windows packages → Run workflow**. Он выполняет `go vet` и
+`go test`, собирает GUI- и CLI-версии Go для Windows, а также проверяет и собирает Python-версию.
+Готовые файлы доступны в Artifacts: `mssql-monitor-go-windows` и
+`mssql-monitor-python-windows` (хранятся 14 дней).
+
 ## Структура исходников
 
 | Файл | Содержимое |
