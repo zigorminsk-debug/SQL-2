@@ -114,6 +114,68 @@ func mustLoadData() {
 	}
 }
 
+// logEvent пишет событие в журнал приложения.
+func logEvent(s string) { log.Printf("event: %s", s) }
+
+// ---------- автообновление базы порталов из GitHub ----------
+
+// portalsRemoteURL — свежая база порталов на нашей рабочей ветке.
+const portalsRemoteURL = "https://raw.githubusercontent.com/zigorminsk-debug/SQL-2/arena/01a0fd02-sql-2/gosportals/portals.json"
+
+var (
+	dbSource = "встроенная"
+	dbAt     time.Time
+)
+
+// refreshPortalsDB — оппортунистическое обновление списка порталов из
+// репозитория. При любой ошибке остаёмся на встроенной базе (exe самодостаточен).
+func refreshPortalsDB(timeout time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, portalsRemoteURL, nil)
+	if err != nil {
+		return
+	}
+	req.Header.Set("User-Agent", "GosPortaly/"+appVer)
+	resp, err := httpClient.Do(req)
+	if err != nil || resp.StatusCode != 200 {
+		return
+	}
+	defer resp.Body.Close()
+	b, err := io.ReadAll(io.LimitReader(resp.Body, 512*1024))
+	if err != nil {
+		return
+	}
+	var fresh []Portal
+	if err := json.Unmarshal(b, &fresh); err != nil || len(fresh) < 10 {
+		return
+	}
+	// Валидация: уникальные id, http(s)-адреса, обязательные поля.
+	seen := map[string]bool{}
+	for _, p := range fresh {
+		if p.ID == "" || p.Name == "" || seen[p.ID] ||
+			!(strings.HasPrefix(p.Site, "http://") || strings.HasPrefix(p.Site, "https://")) {
+			return
+		}
+		seen[p.ID] = true
+	}
+
+	portals = fresh
+	portalIdx = map[string]int{}
+	for i := range portals {
+		if portals[i].Login == "" {
+			portals[i].Login = portals[i].Site
+		}
+		portalIdx[portals[i].ID] = i
+	}
+	stMu.Lock()
+	stTime = time.Time{} // сбросить кэш статусов под новый список
+	stMu.Unlock()
+	dbSource = "GitHub"
+	dbAt = time.Now()
+	logEvent(fmt.Sprintf("база порталов обновлена с GitHub (%d шт.)", len(portals)))
+}
+
 func main() {
 	addr := flag.String("addr", "127.0.0.1", "адрес прослушивания веб-панели (127.0.0.1 — только этот компьютер)")
 	port := flag.Int("port", 0, "порт веб-панели (0 — выбрать свободный автоматически)")
@@ -125,6 +187,9 @@ func main() {
 	_ = web
 
 	mustLoadData()
+	// Оппортунистическое обновление базы порталов из GitHub (не критично,
+	// при любой ошибке работаем на встроенной).
+	refreshPortalsDB(4 * time.Second)
 
 	switch {
 	case *native:
@@ -159,6 +224,7 @@ func runServer(addr string, port int, noOpen bool, opener func(string) error, ur
 	mux.HandleFunc("/api/heartbeat", handleHeartbeat)
 	mux.HandleFunc("GET /api/icon", handleIcon)
 	mux.HandleFunc("GET /api/framing", handleFraming)
+	mux.HandleFunc("POST /api/certs/update", handleCertUpdate)
 	mux.HandleFunc("POST /api/open", handleOpen)
 
 	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", addr, port))
@@ -221,6 +287,8 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 func handleMeta(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{
 		"name": appName, "version": appVer, "os": runtime.GOOS, "arch": runtime.GOARCH,
+		"db": dbSource, "dbAt": dbAt.Format("02.01.2006 15:04"),
+		"portals": len(portals),
 	})
 }
 

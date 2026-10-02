@@ -88,3 +88,15 @@ jobs:
             release/SHA256SUMS.txt \
             --title "ГосПорталы РБ ${{ github.ref_name }}" \
             --generate-notes
+
+      - name: Prerelease "latest" (при пуше в ветку)
+        if: startsWith(github.ref, 'refs/heads/')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view latest >/dev/null 2>&1 || \
+            gh release create latest --prerelease \
+              --title "ГосПорталы РБ (свежая сборка)" \
+              --notes "Автосборка по коммиту ${{ github.sha }}. Всегда самая свежая версия."
+          gh release upload latest release/GosPortalyRB.exe release/SHA256SUMS.txt --clobber

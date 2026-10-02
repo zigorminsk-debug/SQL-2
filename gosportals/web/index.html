@@ -477,6 +477,21 @@ function renderTiles(){
 }
 
 /* ---------- стартовая проверка ---------- */
+function checkAction(c){
+  const bits = [];
+  if (c.fixUrl) bits.push(`<a href="${c.fixUrl}" target="_blank" rel="noopener">${esc(c.fixLabel||"исправить")} →</a>`);
+  if (c.id==="certs" && c.status!=="ok") bits.push(`<a href="#" onclick="fixCerts();return false" style="font-weight:800;white-space:nowrap">⚡ исправить в один клик</a>`);
+  return bits.join(" ");
+}
+async function fixCerts(){
+  toast("Скачиваю официальные сертификаты и СОС с nces.by и устанавливаю в систему…");
+  try{
+    const r = await (await fetch("/api/certs/update",{method:"POST"})).json();
+    const bad = (r.steps||[]).filter(s=>!s.ok);
+    toast(bad.length ? `Частично: не удалось ${bad.length} из ${(r.steps||[]).length} — см. «Настройки входа»` : "Сертификаты и СОС обновлены ✅");
+    startupChecks();
+  }catch(e){ toast("Автообновление не удалось: "+e.message); }
+}
 async function startupChecks(){
   const box = $("#startup");
   if (!box) return;
@@ -486,7 +501,7 @@ async function startupChecks(){
     const rows = await (await fetch("/api/checks")).json();
     const bad = rows.filter(r=>r.status==="fail"), warn = rows.filter(r=>r.status==="warn");
     const when = new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"});
-    const li = list => list.map(c=>`<li><b>${esc(c.title)}</b> — ${esc(c.detail)}${c.fixUrl?` <a href="${c.fixUrl}" target="_blank" rel="noopener">исправить →</a>`:""}</li>`).join("");
+    const li = list => list.map(c=>`<li><b>${esc(c.title)}</b> — ${esc(c.detail)}<br>${checkAction(c)}</li>`).join("");
     if (!bad.length && !warn.length){
       box.className = "startup ok";
       box.innerHTML = `<span class="sp">✅</span><div class="body"><b>Сертификаты и зависимые программы в порядке</b> · проверено в ${when}</div>${recheck}`;
@@ -514,7 +529,7 @@ async function runDiag(){
         <div>
           <div class="t">${esc(c.title)}</div>
           <div class="d">${esc(c.detail)}</div>
-          ${c.fixUrl && c.status!=="ok" ? `<a href="${c.fixUrl}" target="_blank" rel="noopener">${esc(c.fixLabel||"исправить")} →</a>`:""}
+          ${c.status!=="ok" ? checkAction(c):""}
         </div>
       </div>`).join("");
     $("#diagStatus").textContent = "готово, проверок: " + rows.length;
@@ -529,8 +544,9 @@ async function load(){
     renderChips(); renderTiles(); if (EMBED) renderTabs();
     const meta = await (await fetch("/api/meta")).json();
     $("#ver").textContent = "v"+meta.version;
-    $("#metaLine").textContent = `${meta.name} v${meta.version} · сборка: ${meta.os}/${meta.arch} · порталов в базе: ${portals.length}`;
-    $("#footMeta").textContent = `${meta.name} v${meta.version} · вход — только на официальных сайтах`;
+    const dbInfo = meta.db === "GitHub" ? `обновлена с GitHub ${meta.dbAt}` : "встроенная";
+    $("#metaLine").textContent = `${meta.name} v${meta.version} · сборка: ${meta.os}/${meta.arch} · порталов в базе: ${portals.length} · база: ${dbInfo}`;
+    $("#footMeta").textContent = `${meta.name} v${meta.version} · база порталов: ${dbInfo} · вход — только на официальных сайтах`;
     statuses = await (await fetch("/api/status")).json();
     renderTiles();
     startupChecks();
