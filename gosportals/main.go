@@ -114,25 +114,34 @@ func mustLoadData() {
 func main() {
 	addr := flag.String("addr", "127.0.0.1", "адрес прослушивания веб-панели (127.0.0.1 — только этот компьютер)")
 	port := flag.Int("port", 0, "порт веб-панели (0 — выбрать свободный автоматически)")
-	noOpen := flag.Bool("no-open", false, "не открывать браузер автоматически")
-	web := flag.Bool("web", false, "запустить режим веб-панели вместо полноценного GUI")
+	noOpen := flag.Bool("no-open", false, "не открывать окно/браузер автоматически")
+	web := flag.Bool("web", false, "открыть панель в обычном браузере (вкладка) вместо отдельного окна приложения")
+	native := flag.Bool("native", false, "нативный Win32-GUI (таблица, меню, трей) вместо окна приложения")
 	flag.Parse()
 
 	mustLoadData()
 
-	// Windows: по умолчанию — нативный GUI (окно + трей).
-	// Иначе (или с -web) — локальная веб-панель.
-	if !*web && runtime.GOOS == "windows" {
+	switch {
+	case *web || runtime.GOOS != "windows":
+		// Веб-панель в обычном браузере (по умолчанию на Linux/macOS).
+		runServer(*addr, *port, *noOpen, nil, "")
+	case *native:
+		// Нативный GUI на walk; при ошибке — падать в режим окна приложения.
 		if err := runGUI(); err != nil {
-			fmt.Fprintf(os.Stderr, "GUI недоступен (%v)\nЗапускаю веб-панель…\n", err)
-			runServer(*addr, *port, *noOpen)
+			fmt.Fprintf(os.Stderr, "нативный GUI недоступен (%v)\nЗапускаю окно приложения…\n", err)
+			runServer(*addr, *port, *noOpen, openAppWindow, "?embed=1")
 		}
-		return
+	default:
+		// Режим по умолчанию (Windows): единое окно приложения с карточками,
+		// все порталы открываются внутри него; при старте — проверка сертификатов.
+		runServer(*addr, *port, *noOpen, openAppWindow, "?embed=1")
 	}
-	runServer(*addr, *port, *noOpen)
 }
 
-func runServer(addr string, port int, noOpen bool) {
+// runServer поднимает локальный сервер панели. opener=nil (или noOpen) —
+// стандартный браузер; urlSuffix дописывается к URL панели (?embed=1 для
+// отдельного окна). Блокируется навсегда.
+func runServer(addr string, port int, noOpen bool, opener func(string) error, urlSuffix string) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", handleIndex)
 	mux.HandleFunc("GET /api/meta", handleMeta)
@@ -150,22 +159,26 @@ func runServer(addr string, port int, noOpen bool) {
 	if strings.HasPrefix(showURL, "0.0.0.0:") || strings.HasPrefix(showURL, ":") {
 		showURL = "127.0.0.1" + showURL[strings.LastIndex(showURL, ":"):]
 	}
-	url := "http://" + showURL
+	url := "http://" + showURL + urlSuffix
 
 	fmt.Println("========================================================")
 	fmt.Printf("  %s  v%s\n", appName, appVer)
 	fmt.Println("  Панель госпорталов Республики Беларусь")
 	fmt.Println("========================================================")
-	fmt.Printf("  Панель открыта:     %s\n", url)
+	fmt.Printf("  Панель открыта:     %s\n", strings.TrimSuffix(url, "?embed=1"))
 	fmt.Println("  Это окно (терминал) НЕ закрывайте, пока работаете.")
 	fmt.Println("  Для выхода нажмите  Ctrl+C")
 	fmt.Println("========================================================")
 
-	if !noOpen && (addr == "127.0.0.1" || addr == "localhost") {
+	if !noOpen {
+		open := opener
+		if open == nil {
+			open = openBrowser
+		}
 		go func() {
 			time.Sleep(350 * time.Millisecond)
-			if err := openBrowser(url); err != nil {
-				log.Printf("браузер не открылся (%v) — откройте вручную: %s", err, url)
+			if err := open(url); err != nil {
+				log.Printf("окно не открылось (%v) — откройте вручную: %s", err, url)
 			}
 		}()
 	}
