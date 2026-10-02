@@ -87,19 +87,14 @@ jobs:
           if (-not (Test-Path $demoReport)) { throw 'Demo report was not created.' }
 
       - name: Build GUI and CLI binaries
-        shell: pwsh
         run: |
-          $output = Join-Path $env:GITHUB_WORKSPACE 'artifacts\python'
-          $work = Join-Path $env:RUNNER_TEMP 'pyinstaller-work'
-          $spec = Join-Path $env:RUNNER_TEMP 'pyinstaller-spec'
-          New-Item -ItemType Directory -Force -Path $output, $work, $spec | Out-Null
-          python -m PyInstaller --clean --noconfirm --onefile --windowed --name MSSQLMonitor --icon icon.ico --collect-all pymssql --distpath $output --workpath $work --specpath $spec app.py
-          python -m PyInstaller --clean --noconfirm --onefile --console --name MSSQLMonitorCLI --icon icon.ico --collect-all pymssql --distpath $output --workpath $work --specpath $spec app.py
+          python -m PyInstaller --clean --noconfirm --onefile --windowed --name MSSQLMonitor --collect-all pymssql app.py
+          python -m PyInstaller --clean --noconfirm --onefile --console --name MSSQLMonitorCLI --collect-all pymssql app.py
 
       - name: Upload Python Windows binaries
         uses: actions/upload-artifact@v4
         with:
           name: mssql-monitor-python-windows
-          path: artifacts/python/*.exe
+          path: mssql-monitor/dist/*.exe
           if-no-files-found: error
           retention-days: 14
