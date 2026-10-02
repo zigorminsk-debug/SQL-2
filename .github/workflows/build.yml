@@ -38,7 +38,8 @@ jobs:
         shell: bash
         run: |
           go vet ./...
-          bad=$(gofmt -l . | grep -v '^vendor/')
+          # vendor/ исключаем (на Windows gofmt печатает пути с \): чужой код не форматируем
+          bad=$(gofmt -l . | grep -v '^vendor')
           if [ -n "$bad" ]; then echo "gofmt: есть неотформатированные файлы:"; echo "$bad"; exit 1; fi
 
       - name: Сборка GosPortalyRB.exe (Windows x64)
