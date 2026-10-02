@@ -112,13 +112,27 @@ func mustLoadData() {
 }
 
 func main() {
-	addr := flag.String("addr", "127.0.0.1", "адрес прослушивания (127.0.0.1 — только этот компьютер)")
-	port := flag.Int("port", 0, "порт (0 — выбрать свободный автоматически)")
+	addr := flag.String("addr", "127.0.0.1", "адрес прослушивания веб-панели (127.0.0.1 — только этот компьютер)")
+	port := flag.Int("port", 0, "порт веб-панели (0 — выбрать свободный автоматически)")
 	noOpen := flag.Bool("no-open", false, "не открывать браузер автоматически")
+	web := flag.Bool("web", false, "запустить режим веб-панели вместо полноценного GUI")
 	flag.Parse()
 
 	mustLoadData()
 
+	// Windows: по умолчанию — нативный GUI (окно + трей).
+	// Иначе (или с -web) — локальная веб-панель.
+	if !*web && runtime.GOOS == "windows" {
+		if err := runGUI(); err != nil {
+			fmt.Fprintf(os.Stderr, "GUI недоступен (%v)\nЗапускаю веб-панель…\n", err)
+			runServer(*addr, *port, *noOpen)
+		}
+		return
+	}
+	runServer(*addr, *port, *noOpen)
+}
+
+func runServer(addr string, port int, noOpen bool) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", handleIndex)
 	mux.HandleFunc("GET /api/meta", handleMeta)
@@ -127,7 +141,7 @@ func main() {
 	mux.HandleFunc("GET /api/checks", handleChecks)
 	mux.HandleFunc("POST /api/open", handleOpen)
 
-	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", *addr, *port))
+	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", addr, port))
 	if err != nil {
 		log.Fatalf("не удалось занять порт: %v", err)
 	}
@@ -147,7 +161,7 @@ func main() {
 	fmt.Println("  Для выхода нажмите  Ctrl+C")
 	fmt.Println("========================================================")
 
-	if !*noOpen && (*addr == "127.0.0.1" || *addr == "localhost") {
+	if !noOpen && (addr == "127.0.0.1" || addr == "localhost") {
 		go func() {
 			time.Sleep(350 * time.Millisecond)
 			if err := openBrowser(url); err != nil {
