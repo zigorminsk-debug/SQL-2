@@ -47,8 +47,9 @@
 - `build.bat cli` — дополнительно консольная версия `MSSQLMonitorCLI.exe` для Task Scheduler
   (суточный мониторинг + отчёт без открытия окна).
 - Нет желания ставить Python? Используйте **GitHub Actions**: создайте репозиторий, загрузите
-  файлы проекта, вкладка *Actions → Build Windows EXE → Run workflow* — готовый EXE будет в
-  Artifacts (см. `.github/workflows/build-windows.yml`).
+  файлы проекта, вкладка *Actions → Build Windows EXE (Python) → Run workflow* — готовый EXE
+  будет в Artifacts. Workflow находится в корне репозитория:
+  `.github/workflows/build-windows-python.yml` (GitHub запускает workflow только из корня).
 
 Запуск из исходников без сборки: `python app.py`.
 
@@ -142,7 +143,7 @@ MSSQLMonitorCLI.exe --cli --server SRV01 --auth sql --user sa --password *** --s
 | `storage.py` | локальное SQLite-хранилище мониторинга |
 | `demo.py` | демо-режим без сервера |
 | `build.bat` | сборка EXE в один клик |
-| `.github/workflows/build-windows.yml` | автосборка EXE на GitHub |
+| `.github/workflows/build-windows-python.yml` (в корне репозитория) | автосборка EXE на GitHub |
 
 Требования: Windows 7+ / Windows Server 2012+ для EXE; SQL Server 2012–2022 (включая Express);
 для старых версий (2008 R2) часть проверок деградирует корректно.

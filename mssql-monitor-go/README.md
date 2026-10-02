@@ -81,12 +81,21 @@ GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath \
 -o rsrc_windows_amd64.syso` (файл `.syso` подхватывается сборкой Windows
 автоматически).
 
-## Сборка в облаке (без установки Go)
+## Сборка в облаке (GitHub Actions, без установки Go)
 
-В `.github/workflows/build-windows.yml` настроена автоматическая сборка:
-загрузите каталог проекта в репозиторий GitHub — во вкладке **Actions**
-появятся готовые `MSSQLMonitor.exe` и `MSSQLMonitorCLI.exe` (Artifacts),
-а также прогон `go vet`, `gofmt` и дымового демо-отчёта.
+В корне репозитория лежит workflow `.github/workflows/build-windows-go.yml`:
+при каждом пуше GitHub автоматически собирает оба EXE и выкладывает их в
+**Actions → Artifacts** и в **Releases**.
+
+Каждой сборке присваивается **порядковый номер** — счётчик запусков
+workflow: запуск №1 → версия `2.0.0.1`, №2 → `2.0.0.2` и т.д. Номер
+внедряется в сам бинарник (`MSSQLMonitorCLI.exe -version` → `2.0.0.N`),
+попадает в имена файлов (`MSSQLMonitor-2.0.0.N-win64.zip`) и в тег релиза
+(`v2.0.0.N`). Сборки с веток, кроме `main`/`master`, публикуются как
+pre-release. Перед сборкой автоматически прогоняются `gofmt`, `go vet`
+и дымовой демо-отчёт.
+
+Локальная сборка (build.bat) помечается версией `2.0.0-dev`.
 
 ## Структура исходников
 

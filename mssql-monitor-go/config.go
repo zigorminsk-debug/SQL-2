@@ -9,7 +9,14 @@ import (
 	"time"
 )
 
-const Version = "2.0.0"
+// Version — версия программы «база.порядковыйНомерСборки» (например 2.0.0.7).
+// Номер сборки присваивается при компиляции:
+//
+//	GitHub Actions — счётчик запусков workflow:
+//	  -ldflags "-X main.Version=2.0.0.<номер запуска>"  (см. .github/workflows/build-windows-go.yml)
+//	локальная сборка (build.bat) помечается 2.0.0-dev.
+var Version = "2.0.0"
+
 const AppTitle = "MS SQL Monitor — контроль и оптимизация SQL Server"
 
 type Config struct {

@@ -1,0 +1,128 @@
+name: Build Windows EXE (Go)
+
+# Автоматическая сборка Go-версии MSSQLMonitor.exe на GitHub Actions.
+#
+# КАЖДОЙ сборке присваивается порядковый номер — счётчик запусков workflow:
+#   запуск №1 -> версия 2.0.0.1, №2 -> 2.0.0.2, ...
+# Номер внедряется в сам бинарник (-ldflags -X main.Version), попадает в имена
+# файлов (MSSQLMonitor-2.0.0.N-win64.zip) и в тег релиза (v2.0.0.N).
+# Готовые EXE выкладываются в Artifacts и в Releases; сборки с веток, кроме
+# main/master, публикуются как pre-release.
+#
+# ВАЖНО: GitHub запускает только workflow из КОРНЯ репозитория
+# (.github/workflows/), поэтому файл лежит здесь, а не в mssql-monitor-go/.
+
+on:
+  push:
+    branches: [ main, master, 'arena/**' ]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # создание релизов (тег v2.0.0.N)
+
+jobs:
+  build:
+    name: MSSQLMonitor.exe (Windows x64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: mssql-monitor-go
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: mssql-monitor-go/go.mod
+          cache-dependency-path: mssql-monitor-go/go.sum
+
+      - name: Качество кода (gofmt + go vet)
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "Файлы не в формате gofmt:"; echo "$unformatted"; exit 1
+          fi
+          go vet ./...
+
+      - name: Дымовой тест (демо-отчёт без сервера)
+        run: |
+          go build -o /tmp/mssqlmon .
+          /tmp/mssqlmon -demo-report
+          test -s /tmp/reports/demo_report.html && echo "демо-отчёт построен"
+
+      - name: Сборка Windows EXE (версия 2.0.0.$GITHUB_RUN_NUMBER)
+        run: |
+          VER="2.0.0.$GITHUB_RUN_NUMBER"
+          echo "VER=$VER" >> "$GITHUB_ENV"
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath \
+            -ldflags "-s -w -H windowsgui -X main.Version=$VER" \
+            -o release/MSSQLMonitor.exe .
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath \
+            -ldflags "-s -w -X main.Version=$VER" \
+            -o release/MSSQLMonitorCLI.exe .
+          # свежий демо-отчёт этой же сборки — в комплект
+          cp /tmp/reports/demo_report.html release/demo_report.html
+          # проверка PE-заголовков собранных бинарников
+          python3 - <<'PY'
+          import struct
+          for p, sub in (("release/MSSQLMonitor.exe", 2), ("release/MSSQLMonitorCLI.exe", 3)):
+              b = open(p, "rb").read()
+              off = struct.unpack_from("<I", b, 0x3C)[0]
+              assert b[off:off+4] == b"PE\0\0" and struct.unpack_from("<H", b, off+4)[0] == 0x8664, p
+              assert struct.unpack_from("<H", b, off+92)[0] == sub, p
+              print(f"{p}: PE32+ x64, {'GUI (без консоли)' if sub == 2 else 'консольная'}, {len(b)/1048576:.1f} МБ")
+          PY
+          ( cd release && zip -9 "MSSQLMonitor-$VER-win64.zip" \
+              MSSQLMonitor.exe MSSQLMonitorCLI.exe demo_report.html )
+          sha256sum release/MSSQLMonitor.exe release/MSSQLMonitorCLI.exe
+          echo "### Сборка №$GITHUB_RUN_NUMBER — версия \`$VER\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`MSSQLMonitor.exe\` — GUI-версия (без консоли)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`MSSQLMonitorCLI.exe\` — консольная версия" >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`MSSQLMonitor-$VER-win64.zip\` — всё комплектом" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Выложить артефакты сборки
+        uses: actions/upload-artifact@v4
+        with:
+          name: MSSQLMonitor-2.0.0.${{ github.run_number }}-win64
+          path: |
+            mssql-monitor-go/release/MSSQLMonitor.exe
+            mssql-monitor-go/release/MSSQLMonitorCLI.exe
+            mssql-monitor-go/release/MSSQLMonitor-2.0.0.${{ github.run_number }}-win64.zip
+          if-no-files-found: error
+
+      - name: Релиз v2.0.0.N с готовыми EXE
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v$VER"
+          PRERELEASE="--prerelease"
+          case "$GITHUB_REF_NAME" in main|master) PRERELEASE="" ;; esac
+          {
+            echo "🤖 Автоматическая сборка **№$GITHUB_RUN_NUMBER** (GitHub Actions)"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Версия | \`$VER\` |"
+            echo "| Ветка | \`$GITHUB_REF_NAME\` |"
+            echo "| Коммит | \`$GITHUB_SHA\` |"
+            echo
+            echo "**Состав:**"
+            echo "- \`MSSQLMonitor.exe\` — основная программа (GUI). Двойной клик — интерфейс на http://127.0.0.1:8790"
+            echo "- \`MSSQLMonitorCLI.exe\` — консольный вариант (те же флаги, для планировщика)"
+            echo "- \`demo_report.html\` — пример отчёта (демо-сервер, подключение не нужно)"
+            echo "- \`MSSQLMonitor-$VER-win64.zip\` — всё комплектом"
+            echo
+            echo "**SHA-256**"
+            echo '```'
+            ( cd release && sha256sum MSSQLMonitor.exe MSSQLMonitorCLI.exe "MSSQLMonitor-$VER-win64.zip" )
+            echo '```'
+          } > /tmp/release-notes.md
+          if ! gh release view "$TAG" > /dev/null 2>&1; then
+            gh release create "$TAG" --target "$GITHUB_SHA" $PRERELEASE \
+              --title "MS SQL Monitor $VER (сборка №$GITHUB_RUN_NUMBER)" \
+              --notes-file /tmp/release-notes.md
+          fi
+          gh release upload "$TAG" --clobber \
+            release/MSSQLMonitor.exe release/MSSQLMonitorCLI.exe \
+            release/demo_report.html "release/MSSQLMonitor-$VER-win64.zip"

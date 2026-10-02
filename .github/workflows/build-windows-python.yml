@@ -1,0 +1,39 @@
+name: Build Windows EXE (Python)
+# Автоматическая сборка Python-версии (PyInstaller не умеет кросс-компиляцию,
+# поэтому собираем на windows-runner).
+# ВАЖНО: GitHub запускает только workflow из КОРНЯ репозитория
+# (.github/workflows/). Этот файл перенесён из mssql-monitor/.github/workflows/,
+# где он никогда не выполнялся. Сборке присваивается порядковый номер запуска
+# (виден в Actions и в имени артефакта).
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: mssql-monitor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Установка зависимостей
+        run: |
+          pip install -r requirements.txt pyinstaller
+      - name: Сборка GUI EXE
+        run: |
+          pyinstaller --clean --noconfirm --onefile --windowed --name MSSQLMonitor --collect-all pymssql app.py
+      - name: Сборка CLI EXE
+        run: |
+          pyinstaller --clean --noconfirm --onefile --console --name MSSQLMonitorCLI --collect-all pymssql app.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MSSQLMonitor-Python-build.${{ github.run_number }}
+          path: |
+            mssql-monitor/dist/MSSQLMonitor.exe
+            mssql-monitor/dist/MSSQLMonitorCLI.exe
