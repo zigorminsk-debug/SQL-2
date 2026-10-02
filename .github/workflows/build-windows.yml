@@ -1,0 +1,106 @@
+name: Build Windows applications
+
+# Этот workflow должен находиться именно в корневом .github/workflows:
+# GitHub не обнаруживает workflow, лежащий внутри папки отдельного приложения.
+on:
+  # Автосборка запускается после каждого push в любую ветку. Это важно для
+  # рабочих веток Arena: результат можно проверить до слияния в main.
+  push:
+  # Pull request повторно проверяет итог слияния с целевой веткой.
+  pull_request:
+  # Ручной запуск оставлен для повторной сборки без фиктивного коммита.
+  workflow_dispatch:
+
+# Новый push отменяет устаревшую сборку той же ветки, чтобы артефакты всегда
+# соответствовали последним изменениям.
+concurrency:
+  group: windows-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: Go application
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: mssql-monitor-go
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+
+      - name: Install Go from go.mod
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: mssql-monitor-go/go.mod
+          cache-dependency-path: mssql-monitor-go/go.sum
+
+      # Сначала тестируем и собираем обычный бинарник: так ошибки исходников
+      # видны отдельно от особенностей Windows GUI linker flags.
+      - name: Verify sources
+        shell: pwsh
+        run: |
+          go test ./...
+          go vet ./...
+
+      - name: Build GUI and CLI executables
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release | Out-Null
+          go build -trimpath -ldflags "-s -w -H windowsgui" -o release/MSSQLMonitor.exe .
+          go build -trimpath -ldflags "-s -w" -o release/MSSQLMonitorCLI.exe .
+
+      - name: Upload Go executables
+        uses: actions/upload-artifact@v4
+        with:
+          name: MSSQLMonitor-Go-${{ github.sha }}
+          path: |
+            mssql-monitor-go/release/MSSQLMonitor.exe
+            mssql-monitor-go/release/MSSQLMonitorCLI.exe
+            mssql-monitor-go/release/demo_report.html
+          if-no-files-found: error
+
+  python:
+    name: Python application
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: mssql-monitor
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: mssql-monitor/requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt pyinstaller
+
+      # compileall даёт короткую и понятную ошибку до более долгого PyInstaller.
+      - name: Verify Python sources
+        run: python -m compileall -q .
+
+      - name: Build GUI executable
+        run: >-
+          pyinstaller --clean --noconfirm --onefile --windowed
+          --name MSSQLMonitor --icon icon.ico --collect-all pymssql app.py
+
+      - name: Build CLI executable
+        run: >-
+          pyinstaller --clean --noconfirm --onefile --console
+          --name MSSQLMonitorCLI --icon icon.ico --collect-all pymssql app.py
+
+      - name: Upload Python executables
+        uses: actions/upload-artifact@v4
+        with:
+          name: MSSQLMonitor-Python-${{ github.sha }}
+          path: |
+            mssql-monitor/dist/MSSQLMonitor.exe
+            mssql-monitor/dist/MSSQLMonitorCLI.exe
+          if-no-files-found: error
