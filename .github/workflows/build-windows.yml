@@ -73,12 +73,17 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt pyinstaller
 
-      - name: Validate Python source and demo report
+      - name: Validate Python source
+        run: python -m py_compile app.py analysis.py checks.py db.py demo.py monitor.py report.py storage.py
+
+      - name: Generate a demo report
         shell: pwsh
+        env:
+          PYTHONUTF8: '1'
         run: |
-          python -m py_compile app.py analysis.py checks.py db.py demo.py monitor.py report.py storage.py
           $demoReport = Join-Path $env:RUNNER_TEMP 'mssql-monitor-demo-report.html'
-          python app.py --demo-report $demoReport
+          python -u app.py --demo-report $demoReport
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if (-not (Test-Path $demoReport)) { throw 'Demo report was not created.' }
 
       - name: Build GUI and CLI binaries
