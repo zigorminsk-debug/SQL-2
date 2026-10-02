@@ -29,7 +29,7 @@ jobs:
         working-directory: mssql-monitor-go
     steps:
       - name: Check out sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install Go from go.mod
         uses: actions/setup-go@v6
@@ -53,7 +53,7 @@ jobs:
           go build -trimpath -ldflags "-s -w" -o release/MSSQLMonitorCLI.exe .
 
       - name: Upload Go executables
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: MSSQLMonitor-Go-${{ github.sha }}
           path: |
@@ -70,7 +70,7 @@ jobs:
         working-directory: mssql-monitor
     steps:
       - name: Check out sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install Python
         uses: actions/setup-python@v6
@@ -97,7 +97,7 @@ jobs:
           --name MSSQLMonitorCLI --icon icon.ico --collect-all pymssql app.py
 
       - name: Upload Python executables
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: MSSQLMonitor-Python-${{ github.sha }}
           path: |
