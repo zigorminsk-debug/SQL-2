@@ -39,7 +39,8 @@ jobs:
         run: |
           go vet ./...
           # vendor/ исключаем (на Windows gofmt печатает пути с \): чужой код не форматируем
-          bad=$(gofmt -l . | grep -v '^vendor')
+          # "|| true" обязателен: grep с пустым выводом отдаёт код 1, а bash -e тогда прерывает шаг
+          bad=$(gofmt -l . | grep -v '^vendor' || true)
           if [ -n "$bad" ]; then echo "gofmt: есть неотформатированные файлы:"; echo "$bad"; exit 1; fi
 
       - name: Сборка GosPortalyRB.exe (Windows x64)
