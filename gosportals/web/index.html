@@ -11,29 +11,59 @@
     --amber:#b54708; --amber-l:#fef0e6; --blue:#175cd3; --blue-l:#eff5ff;
     --shadow:0 1px 2px rgba(16,24,40,.07),0 2px 6px rgba(16,24,40,.06);
     --shadow-up:0 4px 14px rgba(16,24,40,.14);
+    --strip:#d5dbe2; --strip-in:#c3cad3;
   }
   *{box-sizing:border-box}
-  html,body{height:100%}
-  body{margin:0;font:14px/1.5 "Segoe UI",system-ui,-apple-system,Arial,sans-serif;background:var(--bg);color:var(--ink)}
-  header{background:linear-gradient(120deg,#a52719,var(--red) 55%,#7c1f14);color:#fff}
-  .hwrap{max-width:1280px;margin:0 auto;padding:12px 20px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
-  .logo{width:40px;height:40px;flex:0 0 40px;border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--red);font-size:16px;box-shadow:var(--shadow)}
-  h1{font-size:18px;margin:0}
-  .sub{opacity:.85;font-size:12px;margin-top:1px}
-  .hright{margin-left:auto;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-  .search{position:relative}
-  .search input{width:280px;max-width:60vw;padding:8px 12px 8px 33px;border-radius:8px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.15);color:#fff;outline:none;font-size:13px}
-  .search input::placeholder{color:rgba(255,255,255,.75)}
-  .search input:focus{background:rgba(255,255,255,.24);border-color:#fff}
-  .search svg{position:absolute;left:9px;top:8px;opacity:.8}
-  .tabs{display:flex;background:rgba(0,0,0,.18);border-radius:9px;padding:3px;gap:2px}
-  .tabs button{border:0;background:transparent;color:rgba(255,255,255,.85);padding:6px 12px;border-radius:7px;cursor:pointer;font-size:12.5px;font-weight:600;white-space:nowrap}
-  .tabs button.on{background:#fff;color:var(--red-d);box-shadow:var(--shadow)}
+  html,body{height:100%;overflow:hidden}
+  body{margin:0;font:14px/1.5 "Segoe UI",system-ui,-apple-system,Arial,sans-serif;color:var(--ink);display:flex;flex-direction:column}
+  .hidden{display:none!important}
 
-  main{max-width:1280px;margin:0 auto;padding:16px 20px 60px}
+  /* --- заголовок приложения --- */
+  .titlebar{background:linear-gradient(120deg,#a52719,var(--red) 55%,#7c1f14);color:#fff;flex:0 0 auto}
+  .tbwrap{max-width:100%;padding:8px 14px;display:flex;gap:12px;align-items:center}
+  .logo{width:32px;height:32px;flex:0 0 32px;border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--red);font-size:13px;box-shadow:var(--shadow)}
+  .apptitle{font-weight:800;font-size:15px;white-space:nowrap}
+  .tb-nav{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .tb-nav .search{position:relative}
+  .tb-nav input{width:240px;max-width:40vw;padding:6px 10px 6px 30px;border-radius:8px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.15);color:#fff;outline:none;font-size:12.5px}
+  .tb-nav input::placeholder{color:rgba(255,255,255,.75)}
+  .tb-nav input:focus{background:rgba(255,255,255,.24);border-color:#fff}
+  .tb-nav svg{position:absolute;left:8px;top:7px;opacity:.8}
+  .tb-btn{border:0;background:rgba(0,0,0,.18);color:rgba(255,255,255,.9);padding:6px 11px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap}
+  .tb-btn.on{background:#fff;color:var(--red-d);box-shadow:var(--shadow)}
+  .tb-btn:hover{background:rgba(0,0,0,.28)}
+  .tb-btn.on:hover{background:#fff}
 
-  /* --- стартовая проверка сертификатов и зависимых программ --- */
-  .startup{border-radius:12px;padding:11px 14px;margin-bottom:14px;font-size:12.8px;box-shadow:var(--shadow);border:1px solid var(--line);background:#fff;display:flex;gap:12px;align-items:flex-start}
+  /* --- полоса вкладок (как в браузере) --- */
+  .tabstrip{flex:0 0 auto;background:var(--strip);display:flex;align-items:flex-end;gap:2px;padding:6px 8px 0;overflow-x:auto;scrollbar-width:thin}
+  .tab{display:inline-flex;align-items:center;gap:7px;max-width:230px;min-width:120px;height:34px;padding:0 9px;background:var(--strip-in);border:1px solid rgba(0,0,0,.12);border-bottom:0;border-radius:9px 9px 0 0;cursor:pointer;font-size:12.3px;font-weight:600;color:#3f4a5f;user-select:none;flex:0 1 auto;position:relative}
+  .tab .lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+  .tab img{flex:0 0 16px;width:16px;height:16px;border-radius:3px}
+  .tab .x{flex:0 0 auto;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;color:#667085}
+  .tab .x:hover{background:rgba(0,0,0,.15);color:#111}
+  .tab.on{background:#fff;color:var(--ink);box-shadow:0 -2px 6px rgba(16,24,40,.08)}
+  .tab .spinmini{font-size:12px}
+  .tabplus{flex:0 0 auto;height:26px;width:30px;margin-bottom:4px;border:0;background:transparent;color:#3f4a5f;font-size:16px;cursor:pointer;border-radius:7px}
+  .tabplus:hover{background:rgba(0,0,0,.12)}
+
+  /* --- мини-панель инструментов вкладки --- */
+  .toolbar{flex:0 0 auto;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px;padding:5px 10px;font-size:12px}
+  .toolbar button{border:1px solid var(--line);background:#fff;border-radius:7px;height:26px;min-width:28px;cursor:pointer;font-size:12.5px;color:#475467}
+  .toolbar button:hover{background:#f2f4f7}
+  .toolbar .addr{flex:1;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.8px}
+  .toolbar .addr b{color:#3f4a5f;font-weight:600}
+
+  .content{flex:1;position:relative;background:var(--bg);min-height:0}
+  .homeview{position:absolute;inset:0;overflow-y:auto;padding:16px 20px 60px}
+  .homeview.hidden{display:none}
+  .frames{position:absolute;inset:0;background:#fff}
+  .frames iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}
+  .frames iframe.off{display:none}
+  .loading-veil{position:absolute;inset:0;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;background:#fff;z-index:3;color:var(--muted);font-size:13px;pointer-events:none}
+  .loading-veil .big{animation:rot 1.1s linear infinite;font-size:26px}
+
+  /* --- главная: проверка + плитки --- */
+  .startup{border-radius:12px;padding:11px 14px;margin-bottom:14px;font-size:12.8px;box-shadow:var(--shadow);border:1px solid var(--line);background:#fff;display:flex;gap:12px;align-items:flex-start;max-width:1280px;margin-left:auto;margin-right:auto}
   .startup .sp{flex:0 0 auto;font-size:15px;line-height:1.4}
   .startup .body{flex:1}
   .startup .ttl{font-weight:800}
@@ -41,7 +71,6 @@
   .startup li{padding:3px 0;border-top:1px dashed var(--line)}
   .startup li:first-child{border-top:0}
   .startup a{color:var(--blue);font-weight:700;text-decoration:none;white-space:nowrap}
-  .startup a:hover{text-decoration:underline}
   .startup.ok{background:var(--green-l);border-color:#bfe6cc;color:#14532d}
   .startup.warn{background:var(--amber-l);border-color:#ffd9b5;color:#7a3803}
   .startup.fail{background:#feeceb;border-color:#ffcdc7;color:#7a1a12}
@@ -50,21 +79,16 @@
   .spin{display:inline-block;animation:rot 1.1s linear infinite}
   @keyframes rot{to{transform:rotate(360deg)}}
 
+  .home-inner{max-width:1280px;margin:0 auto}
   .chips{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 14px}
   .chip{border:1px solid var(--line);background:#fff;color:var(--ink);padding:6px 12px;border-radius:999px;cursor:pointer;font-size:12.3px;font-weight:600;box-shadow:var(--shadow)}
   .chip.on{background:var(--red);border-color:var(--red);color:#fff}
 
-  /* --- плитки порталов --- */
   .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(235px,1fr));gap:14px}
   .tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px 15px 12px;box-shadow:var(--shadow);position:relative;cursor:pointer;display:flex;flex-direction:column;gap:7px;transition:transform .12s,box-shadow .12s;min-height:158px}
   .tile:hover{transform:translateY(-3px);box-shadow:var(--shadow-up);border-color:#cfd6de}
-  .t-icon{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:23px;color:#fff;box-shadow:var(--shadow)}
-  .t-icon.report{background:linear-gradient(135deg,#c0392b,#8f2318)}
-  .t-icon.citizen{background:linear-gradient(135deg,#175cd3,#0b3d91)}
-  .t-icon.ved{background:linear-gradient(135deg,#b54708,#7c2d0e)}
-  .t-icon.torg{background:linear-gradient(135deg,#6941c6,#43239b)}
-  .t-icon.service{background:linear-gradient(135deg,#1e7a3c,#0d4f23)}
-  .t-icon.ref{background:linear-gradient(135deg,#475467,#2b3648)}
+  .t-icon{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:23px;color:#fff;box-shadow:var(--shadow);position:relative;overflow:hidden;background:#eceff3}
+  .t-icon img{position:absolute;inset:4px;width:38px;height:38px;padding:3px;border-radius:10px;background:#fff;object-fit:contain}
   .t-name{font-weight:700;font-size:13.8px;line-height:1.3}
   .t-desc{color:var(--muted);font-size:11.8px;line-height:1.35}
   .t-badges{display:flex;gap:4px;flex-wrap:wrap}
@@ -88,7 +112,19 @@
   .t-note{position:absolute;inset:0;background:rgba(255,255,255,.98);border-radius:14px;padding:14px;font-size:11.8px;line-height:1.45;color:#3f4a5f;overflow:auto;display:none;flex-direction:column;gap:8px;box-shadow:var(--shadow-up);z-index:2}
   .t-note.show{display:flex}
   .t-note b{color:var(--ink)}
-  .t-note .x{align-self:flex-end;border:0;background:var(--red);color:#fff;border-radius:7px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer}
+  .t-note .x2{align-self:flex-end;border:0;background:var(--red);color:#fff;border-radius:7px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer}
+
+  /* --- блок компании-разработчика на главном экране --- */
+  .company{background:linear-gradient(120deg,#a52719,var(--red) 55%,#7c1f14);border-radius:14px;color:#fff;padding:18px 20px;box-shadow:var(--shadow-up);margin-top:22px;display:flex;gap:18px 22px;flex-wrap:wrap;align-items:center}
+  .company .cmark{width:52px;height:52px;flex:0 0 52px;border-radius:12px;background:#fff;color:var(--red);font-weight:800;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:var(--shadow)}
+  .company .cname{font-weight:800;font-size:16.5px;line-height:1.25}
+  .company .croll{font-size:12.5px;opacity:.92;font-style:italic;margin-top:2px}
+  .company .cmarkwrap{display:flex;gap:13px;align-items:center}
+  .company .cgrid{display:flex;gap:12px 26px;flex-wrap:wrap;margin-left:auto;align-items:flex-start}
+  .company .citem{font-size:12.6px;line-height:1.5}
+  .company .citem .k{opacity:.82;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;font-weight:700}
+  .company a{color:#fff;font-weight:700;text-decoration:none;border-bottom:1px dashed rgba(255,255,255,.6)}
+  .company a:hover{border-bottom:1px solid #fff}
 
   .panel{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px;box-shadow:var(--shadow);margin-bottom:16px}
   .panel h2{margin:0 0 4px;font-size:16px}
@@ -98,7 +134,6 @@
   .tool h3{margin:0 0 4px;font-size:13.5px}
   .tool p{margin:0 0 9px;font-size:12.3px;color:var(--muted)}
   .tool a{color:var(--blue);font-weight:700;font-size:12.5px;text-decoration:none}
-  .tool a:hover{text-decoration:underline}
   .diag-row{display:flex;gap:10px;align-items:flex-start;padding:10px 2px;border-top:1px solid var(--line);font-size:13px}
   .diag-row .ic{width:22px;flex:0 0 22px;font-weight:800;text-align:center}
   .ic.ok{color:var(--green)} .ic.warn{color:var(--amber)} .ic.fail{color:#d92d20} .ic.info{color:var(--blue)}
@@ -112,119 +147,139 @@
   .warn-box{background:var(--blue-l);border:1px solid #c8ddff;color:#123b7a;border-radius:10px;padding:11px 14px;font-size:12.6px}
   .sec-hidden{display:none}
   .footer{color:var(--muted);font-size:11.8px;margin-top:26px;text-align:center}
-  .btn{display:inline-flex;align-items:center;gap:6px;text-decoration:none;border-radius:8px;padding:8px 13px;font-size:12.8px;font-weight:700;border:1px solid var(--line);color:var(--ink);background:#fff;cursor:pointer;box-shadow:var(--shadow)}
+  .btn{display:inline-flex;align-items:center;gap:6px;border-radius:8px;padding:8px 13px;font-size:12.8px;font-weight:700;border:1px solid var(--line);color:var(--ink);background:#fff;cursor:pointer;box-shadow:var(--shadow)}
   .btn.primary{background:var(--green);border-color:var(--green);color:#fff}
-  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#1c2430;color:#fff;padding:10px 18px;border-radius:9px;font-size:13px;box-shadow:var(--shadow-up);opacity:0;transition:.25s;pointer-events:none;max-width:82vw;text-align:center;z-index:9}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#1c2430;color:#fff;padding:10px 18px;border-radius:9px;font-size:13px;box-shadow:var(--shadow-up);opacity:0;transition:.25s;pointer-events:none;max-width:82vw;text-align:center;z-index:99}
   .toast.show{opacity:1}
   kbd{background:#eef0f3;border:1px solid #d5d9e0;border-bottom-width:2px;border-radius:5px;padding:0 5px;font-size:11px}
-  @media(max-width:680px){.search input{width:54vw}.hright{width:100%;margin-left:0}.tabs{order:3}}
+  @media(max-width:680px){.tb-nav input{width:44vw}}
 </style>
 </head>
 <body>
-<header>
-  <div class="hwrap">
-    <div class="logo">БЯ</div>
-    <div>
-      <h1>ГосПорталы РБ</h1>
-      <div class="sub">Все порталы Беларуси — в одном окне <span id="ver"></span></div>
-    </div>
-    <div class="hright">
-      <div class="search">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <input id="q" placeholder="Поиск: МНС, ФСЗН, ЭСЧФ…">
+  <div class="titlebar">
+    <div class="tbwrap">
+      <div class="logo">БЯ</div>
+      <div class="apptitle">ГосПорталы РБ <span id="ver" style="font-weight:400;font-size:11px;opacity:.85"></span></div>
+      <div class="tb-nav">
+        <div class="search">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="q" placeholder="Поиск портала…">
+        </div>
+        <button class="tb-btn on" data-sec="portals">🧮 Порталы</button>
+        <button class="tb-btn" data-sec="setup">⚙ Настройки входа</button>
+        <button class="tb-btn" data-sec="help">❓ Помощь</button>
       </div>
-      <nav class="tabs">
-        <button data-tab="portals" class="on">🧮 Порталы</button>
-        <button data-tab="setup">⚙ Настройки входа</button>
-        <button data-tab="help">❓ Помощь</button>
-      </nav>
     </div>
   </div>
-</header>
 
-<main>
-  <section id="sec-portals">
-    <!-- Стартовая проверка сертификатов и зависимых программ -->
-    <div class="startup" id="startup">
-      <span class="sp spin">⏳</span>
-      <div class="body"><span class="ttl">Идёт проверка сертификатов и зависимых программ…</span><br>
-      AVEST CSP, AvTuneProxy, корневые сертификаты НУЦ/ГосСУОК — обычно 5–15 секунд.</div>
-    </div>
-    <div class="chips" id="chips"></div>
-    <div class="tiles" id="tiles"></div>
-    <div class="footer" id="footMeta"></div>
-  </section>
+  <div class="tabstrip" id="tabstrip"></div>
 
-  <section id="sec-setup" class="sec-hidden">
-    <div class="panel">
-      <h2>Диагностика рабочего места</h2>
-      <p class="lead">Проверка «настроек для входа» на госпорталы. Запускается автоматически при старте приложения; здесь можно повторить. Всё выполняется локально.</p>
-      <button class="btn primary" id="runDiag">▶ Проверить ещё раз</button>
-      <span class="statusline" id="diagStatus" style="font-size:12px;color:var(--muted);margin-left:10px"></span>
-      <div id="diagOut"></div>
-    </div>
-    <div class="panel">
-      <h2>Что нужно для входа по ЭЦП</h2>
-      <p class="lead">Юрлица и ИП работают на госпорталах с электронной цифровой подписью. Минимальный набор:</p>
-      <div class="tools">
-        <div class="tool"><h3>1. Криптопровайдер AVEST CSP</h3><p>Национальное СКЗИ: без него не работают МНС, ФСЗН, Минфин, Белгосстрах, Белстат по ЭЦП. Есть бесплатный ознакомительный период.</p><a href="https://avest.by" target="_blank" rel="noopener">avest.by → скачать/обновить</a></div>
-        <div class="tool"><h3>2. Сертификат ключа ЭЦП</h3><p>Выдаётся удостоверяющим центром (РУЦ ОСТ, НУЦ, ГосСУОК — для бюджетников). Носитель — токен/флешка AVEST.</p><a href="https://nca.by" target="_blank" rel="noopener">nca.by — Нац. удостоверяющий центр</a></div>
-        <div class="tool"><h3>3. Корневые сертификаты НУЦ / ГосСУОК</h3><p>Ставятся в «Доверенные корневые» Windows, иначе порталы пишут «сертификат не доверенный». Следите за сроками — приложение подскажет об истечении.</p><a href="https://nca.by" target="_blank" rel="noopener">nca.by</a> · <a href="https://gosuok.gov.by" target="_blank" rel="noopener">gosuok.gov.by</a></div>
-        <div class="tool"><h3>4. AvTuneProxy (вход «без ЭЦП»)</h3><p>Нужен только для Корпоративного портала ФСЗН при входе по логину МСИ вместо ЭЦП.</p><a href="https://avtunproxy.by/windows/" target="_blank" rel="noopener">avtunproxy.by → скачать для Windows</a></div>
-        <div class="tool"><h3>5. Браузер с режимом IE</h3><p>МНС (физическая ЭЦП) и «Электронный респондент» Белстата работают в IE 11 или Edge в режиме IE. МЭЦП и логин/пароль — в любых.</p><a href="#" id="showIeSteps">инструкция по включению режима IE ↓</a></div>
-        <div class="tool"><h3>6. Токен с драйвером</h3><p>Аппаратный носитель виден в «Диспетчере сертификатов» (AvCertMgr) после установки AVEST CSP.</p><a href="https://avest.by" target="_blank" rel="noopener">документация Avest →</a></div>
-      </div>
-      <div id="ieSteps" class="sec-hidden" style="margin-top:12px">
-        <div class="panel" style="margin:0;background:#fafbfc">
-          <h2 style="font-size:14px">Включение режима IE в Microsoft Edge</h2>
+  <div class="toolbar hidden" id="toolbar">
+    <button id="tbReload" title="обновить страницу">⟳</button>
+    <button id="tbOutside" title="открыть в отдельном окне браузера">↗</button>
+    <div class="addr" id="tbAddr"></div>
+  </div>
+
+  <div class="content">
+    <div class="homeview" id="homeView"><div class="home-inner">
+      <!-- секция: порталы -->
+      <section id="sec-portals">
+        <div class="startup" id="startup">
+          <span class="sp spin">⏳</span>
+          <div class="body"><span class="ttl">Идёт проверка сертификатов и зависимых программ…</span><br>
+          AVEST CSP, AvTuneProxy, корневые сертификаты НУЦ/ГосСУОК — 5–15 секунд.</div>
+        </div>
+        <div class="chips" id="chips"></div>
+        <div class="tiles" id="tiles"></div>
+        <div class="company">
+          <div class="cmarkwrap">
+            <div class="cmark">КБ</div>
+            <div>
+              <div class="cname">ООО «Компьютерная безопасность»</div>
+              <div class="croll">«Ваш комфорт — наша забота»</div>
+            </div>
+          </div>
+          <div class="cgrid">
+            <div class="citem"><div class="k">Разработчик</div><a href="tel:+375293371412">Zakharevich Igor</a></div>
+            <div class="citem"><div class="k">Телефон</div><a href="tel:+375293371412">+375 29 337-14-12</a></div>
+            <div class="citem"><div class="k">E-mail</div><a href="mailto:info@csl.by">info@csl.by</a></div>
+            <div class="citem"><div class="k">Сайт</div><a href="https://csl.by/?utm_source=gosportaly-app" target="_blank" rel="noopener">csl.by</a></div>
+            <div class="citem"><div class="k">Адрес</div><a href="https://yandex.by/maps/157/minsk/?text=%D1%83%D0%BB.+%D0%A4%D0%B0%D0%B1%D1%80%D0%B8%D1%86%D0%B8%D1%83%D1%81%D0%B0%2C+9&z=17" target="_blank" rel="noopener">г. Минск, ул. Фабрициуса, 9</a></div>
+            <div class="citem"><div class="k">Время работы</div>пн–пт, 9:00–17:00</div>
+          </div>
+        </div>
+        <div class="footer" id="footMeta"></div>
+      </section>
+      <!-- секция: настройки входа -->
+      <section id="sec-setup" class="sec-hidden">
+        <div class="panel">
+          <h2>Диагностика рабочего места</h2>
+          <p class="lead">Проверка «настроек для входа». Запускается автоматически при старте; здесь можно повторить. Всё выполняется локально.</p>
+          <button class="btn primary" id="runDiag">▶ Проверить ещё раз</button>
+          <span id="diagStatus" style="font-size:12px;color:var(--muted);margin-left:10px"></span>
+          <div id="diagOut"></div>
+        </div>
+        <div class="panel">
+          <h2>Что нужно для входа по ЭЦП</h2>
+          <div class="tools">
+            <div class="tool"><h3>1. Криптопровайдер AVEST CSP</h3><p>Национальное СКЗИ: без него не работают МНС, ФСЗН, Минфин, Белгосстрах, Белстат по ЭЦП.</p><a href="https://avest.by" target="_blank" rel="noopener">avest.by → скачать/обновить</a></div>
+            <div class="tool"><h3>2. Сертификат ключа ЭЦП</h3><p>Выдаётся удостоверяющим центром (РУЦ ОСТ, НУЦ, ГосСУОК). Носитель — токен/флешка AVEST.</p><a href="https://nca.by" target="_blank" rel="noopener">nca.by →</a></div>
+            <div class="tool"><h3>3. Корневые сертификаты НУЦ / ГосСУОК</h3><p>Ставятся в «Доверенные корневые» Windows. Следите за сроками — приложение подскажет об истечении.</p><a href="https://nca.by" target="_blank" rel="noopener">nca.by</a> · <a href="https://gosuok.gov.by" target="_blank" rel="noopener">gosuok.gov.by</a></div>
+            <div class="tool"><h3>4. AvTuneProxy (вход «без ЭЦП»)</h3><p>Нужен только для ФСЗН при входе по логину МСИ вместо ЭЦП.</p><a href="https://avtunproxy.by/windows/" target="_blank" rel="noopener">avtunproxy.by → скачать</a></div>
+            <div class="tool"><h3>5. Браузер с режимом IE</h3><p>МНС (физическая ЭЦП) и «Электронный респондент» Белстата работают в IE 11 / Edge в режиме IE. Если портал запрещает встроенные вкладки — он откроется отдельным окном автоматически.</p><a href="#" id="showIeSteps">инструкция ↓</a></div>
+            <div class="tool"><h3>6. Токен с драйвером</h3><p>Носитель виден в «Диспетчере сертификатов» (AvCertMgr) после установки AVEST CSP.</p><a href="https://avest.by" target="_blank" rel="noopener">документация →</a></div>
+          </div>
+          <div id="ieSteps" class="sec-hidden" style="margin-top:12px">
+            <div class="panel" style="margin:0;background:#fafbfc">
+              <h2 style="font-size:14px">Включение режима IE в Microsoft Edge</h2>
+              <ol class="steps">
+                <li>Edge → «…» → <b>Параметры</b> → <b>Браузер по умолчанию</b>.</li>
+                <li>«Разрешить сайтам перезагрузку в режиме Internet Explorer» → <b>Разрешить</b>, перезапустите Edge.</li>
+                <li>«Страницы в режиме IE» → <b>Добавить страницу</b> — адрес портала.</li>
+                <li>Открывайте портал из панели — загрузится в режиме IE.</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Идентификация без ЭЦП (МСИ, ЕСА, логин/пароль)</h2>
+          <div class="tools">
+            <div class="tool"><h3>МСИ — Межбанковская система идентификации</h3><p>Подтверждение личности онлайн: ЛК МНС (физлица), ФСЗН «без ЭЦП», банки.</p><a href="https://ioauth.raschet.by/client/" target="_blank" rel="noopener">регистрация/вход →</a></div>
+            <div class="tool"><h3>ЕСА — Единая служба аутентификации</h3><p>Единая учётная запись для portal.gov.by и «Обращений».</p><a href="https://auth.gia.gov.by" target="_blank" rel="noopener">auth.gia.gov.by →</a></div>
+            <div class="tool"><h3>Логин/пароль ЛК МНС (физлица)</h3><p>Бесплатно в любой налоговой по паспорту или удалённо через МСИ.</p><a href="https://lkfl.portal.nalog.gov.by" target="_blank" rel="noopener">lkfl.portal.nalog.gov.by →</a></div>
+          </div>
+        </div>
+      </section>
+      <!-- секция: помощь -->
+      <section id="sec-help" class="sec-hidden">
+        <div class="panel">
+          <h2>Как работать</h2>
           <ol class="steps">
-            <li>Откройте Edge → «…» → <b>Параметры</b> → <b>Браузер по умолчанию</b>.</li>
-            <li>«Разрешить сайтам перезагрузку в режиме Internet Explorer» → <b>Разрешить</b>, перезапустите Edge.</li>
-            <li>«Страницы в режиме Internet Explorer» → <b>Добавить страницу</b> и введите адрес портала.</li>
-            <li>Откройте портал из панели — страница загрузится в режиме IE.</li>
+            <li>При запуске приложение <b>само проверяет сертификаты и зависимые программы</b> — результат в полосе сверху списка порталов.</li>
+            <li>Клик по плитке открывает портал <b>в новой вкладке внутри этого окна</b>; переключение — по полосе вкладок (⌂ Главная всегда слева). Длинные названия сокращаются аббревиатурой — наведите мышь для полного.</li>
+            <li>Если портал запрещает встроенные вкладки (защита сайта) — он откроется отдельным окном браузера автоматически.</li>
+            <li>Приложение завершается само, когда главное окно закрыто.</li>
           </ol>
         </div>
-      </div>
-    </div>
-    <div class="panel">
-      <h2>Идентификация без ЭЦП (МСИ, ЕСА, логин/пароль)</h2>
-      <div class="tools">
-        <div class="tool"><h3>МСИ — Межбанковская система идентификации</h3><p>Подтверждение личности онлайн: ЛК МНС (физлица), ФСЗН «без ЭЦП», банки. Регистрация — на сайте ЕРИП, в банке или у оператора.</p><a href="https://ioauth.raschet.by/client/" target="_blank" rel="noopener">регистрация/вход в МСИ →</a></div>
-        <div class="tool"><h3>ЕСА — Единая служба аутентификации</h3><p>Единая учётная запись для portal.gov.by и «Обращений». Регистрация — на портале услуг, в РСЦ ОАИП или через МСИ.</p><a href="https://auth.gia.gov.by" target="_blank" rel="noopener">auth.gia.gov.by →</a></div>
-        <div class="tool"><h3>Логин/пароль ЛК МНС (физлица)</h3><p>Учётная запись выдаётся бесплатно в любой налоговой по паспорту, удалённо — через МСИ или МТС/А1/life.</p><a href="https://lkfl.portal.nalog.gov.by" target="_blank" rel="noopener">lkfl.portal.nalog.gov.by →</a></div>
-      </div>
-    </div>
-  </section>
-
-  <section id="sec-help" class="sec-hidden">
-    <div class="panel">
-      <h2>Как работать</h2>
-      <ol class="steps">
-        <li>При запуске приложение <b>само проверяет сертификаты и зависимые программы</b> — результат в полосе сверху. Красное — жмите ссылку «исправить».</li>
-        <li>Клик по плитке — портал открывается <b>прямо в этом окне</b>. Возврат к плиткам: <kbd>Alt</kbd>+<kbd>←</kbd> (или кнопка «Назад»).</li>
-        <li>Зелёная точка — портал отвечает. Серые — проверка, красная — недоступен (часто регламентные работы).</li>
-        <li>★ в углу плитки — в избранное. ⓘ — памятка «что нужно для входа».</li>
-        <li>Вкладка <b>«Настройки входа»</b> — диагностика и инструкции по ЭЦП/МСИ/ЕСА.</li>
-      </ol>
-    </div>
-    <div class="panel">
-      <h2>Безопасность</h2>
-      <div class="warn-box">
-        🛡 Приложение локальное, <b>не запрашивает и не хранит логины/пароли/ЭЦП</b>. Вход выполняется только на официальных доменах <b>*.gov.by</b> и официальных сервисах — перед вводом данных проверяйте адрес и сертификат страницы.
-      </div>
-    </div>
-    <div class="panel">
-      <h2>О программе</h2>
-      <p class="lead">Одно окно вместо десятков ярлыков — по мотивам BELPORTAL (belportal.by). Однофайловый exe, установка не требуется.</p>
-      <p class="statusline" id="metaLine" style="font-size:12px;color:var(--muted)"></p>
-    </div>
-  </section>
-</main>
+        <div class="panel">
+          <h2>Безопасность</h2>
+          <div class="warn-box">🛡 Приложение локальное, <b>не запрашивает и не хранит логины/пароли/ЭЦП</b>. Вход — только на официальных доменах <b>*.gov.by</b> и официальных сервисах. Проверяйте адрес и сертификат страницы перед вводом данных.</div>
+        </div>
+        <div class="panel">
+          <h2>О программе</h2>
+          <p class="lead">Одно окно вместо десятков ярлыков — по мотивам BELPORTAL (belportal.by). Однофайловый exe, установка не требуется.</p>
+          <p class="lead" style="margin-bottom:2px">Разработка: <b>ООО «Компьютерная безопасность»</b> — «Ваш комфорт — наша забота». Разработчик: <a href="tel:+375293371412" style="color:var(--blue);font-weight:700;text-decoration:none">Zakharevich Igor, +375 29 337-14-12</a> · <a href="mailto:info@csl.by" style="color:var(--blue);font-weight:700;text-decoration:none">info@csl.by</a> · <a href="https://csl.by" target="_blank" rel="noopener" style="color:var(--blue);font-weight:700;text-decoration:none">csl.by</a></p>
+          <p id="metaLine" style="font-size:12px;color:var(--muted)"></p>
+        </div>
+      </section>
+    </div></div>
+    <div class="frames hidden" id="frames"></div>
+  </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-const EMBED = /(^|[?&])embed=1/.test(location.search); // запущено как отдельное окно приложения
+const MAX_TABS = 10;
 const CATS = {
   report:"🧾 Налоги и отчётность", citizen:"👤 Гражданам", ved:"🚛 ВЭД и таможня",
   torg:"🏗 Закупки и торги", service:"🏛 Госуслуги и идентификация", ref:"📚 Справочные"
@@ -234,24 +289,109 @@ const AUTH = {ecp:["ЭЦП","ecp"], mecp:["МЭЦП","mecp"], msi:["МСИ","msi
 
 let portals = [], statuses = {}, activeCat = "all", openNoteId = null;
 let favs = new Set(JSON.parse(localStorage.getItem("gp_favs") || "[]"));
+let tabs = [{ id:"home", home:true, label:"⌂ Главная" }];
+let activeTabId = "home";
+let homeSection = "portals";
 
 const $ = s => document.querySelector(s);
 const esc = s => (s||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const toast = m => { const t=$("#toast"); t.textContent=m; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),3400); };
+const toast = m => { const t=$("#toast"); t.textContent=m; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),4200); };
+const shortHost = u => (u||"").replace(/^https?:\/\//,"").replace(/\/.*$/,"");
+const badgeClass = a => (AUTH[a]||["?","lp"])[1];
+const badgeText = a => (AUTH[a]||[a])[0];
 
-function openUrl(url, inside=true){
-  if (EMBED && inside){
-    toast("Портал откроется в этом окне · назад: Alt+←");
-    setTimeout(()=>{ location.href = url; }, 450);
-  } else {
-    window.open(url, "_blank", "noopener");
+/* короткая подпись вкладки: длинные названия — аббревиатурой */
+function tabLabel(name){
+  if (name.length <= 16) return name;
+  const words = name.replace(/[«»()«»",.]/g," ").split(/[\s—–\-]+/).filter(w=>w.length>1);
+  let ab = words.map(w=>w[0].toUpperCase()).join("");
+  if (ab.length >= 3 && ab.length <= 6) return ab;
+  return name.slice(0, 15) + "…";
+}
+
+/* ---------- управление вкладками ---------- */
+function renderTabs(){
+  const strip = $("#tabstrip");
+  strip.innerHTML = tabs.map(t=>{
+    const on = t.id===activeTabId ? "on" : "";
+    if (t.home) return `<button class="tab home ${on}" data-id="home" title="Главная"><span class="lbl">⌂ Главная</span></button>`;
+    return `<button class="tab ${on}" data-id="${t.id}" title="${esc(t.fullTitle)}">
+      <img src="/api/icon?id=${t.id}" alt="" onerror="this.outerHTML='📄'">
+      ${t.loading?'<span class="spin spinmini">⏳</span>':""}
+      <span class="lbl">${esc(t.label)}</span>
+      <span class="x" data-x="${t.id}" title="закрыть вкладку">✕</span>
+    </button>`;
+  }).join("") + `<button class="tabplus" id="tabPlus" title="новый портал — на главную">＋</button>`;
+  $("#tabPlus").onclick = () => { activateTab("home"); $("#q").focus(); };
+  strip.querySelectorAll(".tab").forEach(el=>{
+    el.onclick = e => {
+      const x = e.target.closest("[data-x]");
+      if (x) { e.stopPropagation(); closeTab(x.dataset.x); return; }
+      activateTab(el.dataset.id);
+    };
+  });
+}
+
+function currentTab(){ return tabs.find(t=>t.id===activeTabId); }
+
+function activateTab(id){
+  if (!tabs.find(t=>t.id===id)) id = "home";
+  activeTabId = id;
+  renderTabs();
+  const home = id === "home";
+  $("#homeView").classList.toggle("hidden", !home);
+  $("#frames").classList.toggle("hidden", home);
+  $("#toolbar").classList.toggle("hidden", home);
+  document.querySelectorAll("#frames iframe").forEach(f=>f.classList.add("off"));
+  if (!home){
+    const t = currentTab();
+    const fr = document.getElementById("fr-"+id);
+    if (fr) fr.classList.remove("off");
+    $("#tbAddr").textContent = t.url;
   }
 }
 
-function badgeClass(a){ return (AUTH[a]||["?","lp"])[1]; }
-function badgeText(a){ return (AUTH[a]||[a])[0]; }
-const shortHost = u => u.replace(/^https?:\/\//,"").replace(/\/.*$/,"");
+async function openPortal(p){
+  const existing = tabs.find(t=>t.id===p.id);
+  if (existing){ activateTab(p.id); return; }
+  if (tabs.length >= MAX_TABS){ toast("Открыто много вкладок — закройте пару вкладок порталов"); return; }
+  // Портал запрещает встраивание? Спросим у нашего сервера (он читает заголовки сайта).
+  let blocked = false, reason = "";
+  try{
+    const fr = await (await fetch("/api/framing?id="+p.id)).json();
+    blocked = fr.blocked; reason = fr.reason || "";
+  }catch(e){ /* сеть сервера недоступна — пробуем вкладку */ }
+  if (blocked){
+    toast(`«${p.name}» запрещает встроенные вкладки (${reason}) — открою отдельным окном`);
+    window.open(p.login, "_blank", "noopener");
+    return;
+  }
+  const t = { id:p.id, label:tabLabel(p.name), fullTitle:p.name+" — "+shortHost(p.login), url:p.login, loading:true };
+  tabs.push(t);
+  const fr2 = document.createElement("iframe");
+  fr2.id = "fr-"+p.id;
+  fr2.setAttribute("referrerpolicy","no-referrer-when-downgrade");
+  const veil = document.createElement("div");
+  veil.className = "loading-veil"; veil.id = "veil-"+p.id;
+  veil.innerHTML = `<div class="big">⏳</div><div>Открываю «${esc(p.name)}»…</div>`;
+  $("#frames").appendChild(fr2); $("#frames").appendChild(veil);
+  fr2.onload = () => { t.loading = false; veil.remove(); renderTabs(); };
+  setTimeout(()=>{ t.loading=false; veil.remove(); renderTabs(); }, 20000);
+  fr2.src = p.login;
+  activateTab(p.id);
+}
 
+function closeTab(id){
+  const idx = tabs.findIndex(t=>t.id===id);
+  if (idx < 0) return;
+  tabs.splice(idx,1);
+  document.getElementById("fr-"+id)?.remove();
+  document.getElementById("veil-"+id)?.remove();
+  if (activeTabId === id) activateTab(tabs[Math.max(0, idx-1)].id);
+  else renderTabs();
+}
+
+/* ---------- главная: чипы и плитки ---------- */
 function renderChips(){
   const el = $("#chips");
   const cats = ["all","fav", ...new Set(portals.map(p=>p.cat))];
@@ -271,16 +411,16 @@ function renderTiles(){
     return true;
   });
   const grid = $("#tiles");
-  if(!list.length){ grid.innerHTML = `<div class="panel" style="grid-column:1/-1">Ничего не найдено — уточните запрос или сбросьте фильтр.</div>`; return; }
+  if(!list.length){ grid.innerHTML = `<div class="panel">Ничего не найдено — уточните запрос или сбросьте фильтр.</div>`; return; }
   grid.innerHTML = list.map(p=>{
     const st = statuses[p.id];
     const dot = st ? (st.ok ? "up":"down") : "";
     const stText = st ? (st.ok ? `доступен · ${st.ms} мс` : "недоступен") : "проверка…";
     const badges = (p.auth||[]).map(a=>`<span class="b ${badgeClass(a)}">${badgeText(a)}</span>`).join("")
                  + (p.ie?`<span class="b ie">IE-режим</span>`:"");
-    return `<article class="tile" data-id="${p.id}" tabindex="0" role="button" aria-label="${esc(p.name)}">
+    return `<article class="tile" data-id="${p.id}" tabindex="0" role="button" title="${esc(p.name)}">
       <div style="display:flex;gap:11px;align-items:flex-start">
-        <div class="t-icon ${p.cat}">${CATGLYPH[p.cat]||"🏛"}</div>
+        <div class="t-icon"><img src="/api/icon?id=${p.id}" alt="" onerror="this.remove()"><span class="glyph ${CATGLYPH[p.cat]? '':''}">${CATGLYPH[p.cat]||"🏛"}</span></div>
         <div style="flex:1;min-width:0">
           <div class="t-name">${esc(p.name)}</div>
           <div class="t-desc">${esc(shortHost(p.login))}</div>
@@ -291,15 +431,15 @@ function renderTiles(){
         <span class="dot ${dot}"></span><span class="t-st">${stText}</span>
         <span class="t-btns">
           <button class="icobtn" data-act="note" title="что нужно для входа">ⓘ</button>
-          ${p.site!==p.login?`<button class="icobtn" data-act="site" title="открыть сайт (не вход)">🌐</button>`:""}
+          ${p.site!==p.login?`<button class="icobtn" data-act="site" title="сайт — отдельное окно">🌐</button>`:""}
           <button class="icobtn star ${favs.has(p.id)?'on':''}" data-act="fav" title="в избранное">★</button>
         </span>
       </div>
       <div class="t-note ${openNoteId===p.id?'show':''}">
         <b>Что нужно для входа</b>
-        <div>${esc(p.note || "ЭЦП/учётная запись по требованиям портала.")}</div>
-        ${p.ie?`<div>⚠ Нужен IE 11 или Edge в режиме IE (см. «Настройки входа»).</div>`:""}
-        <button class="x" data-act="close">понятно</button>
+        <div>${esc(p.note || "ЭЦП / учётная запись по требованиям портала.")}</div>
+        ${p.ie?`<div>⚠ Нужен IE 11 или Edge в режиме IE.</div>`:""}
+        <button class="x2" data-act="close">понятно</button>
       </div>
     </article>`;
   }).join("");
@@ -308,20 +448,22 @@ function renderTiles(){
     const id = t.dataset.id;
     const p = portals.find(x=>x.id===id);
     t.onclick = e => {
+      if (e.target.closest(".t-note") && !e.target.closest("[data-act]")) return;
       const act = e.target.closest("[data-act]")?.dataset.act;
       if (act === "fav"){ e.stopPropagation(); favs.has(id)?favs.delete(id):favs.add(id); localStorage.setItem("gp_favs",JSON.stringify([...favs])); renderChips(); renderTiles(); return; }
-      if (act === "site"){ e.stopPropagation(); openUrl(p.site, false); return; }
+      if (act === "site"){ e.stopPropagation(); window.open(p.site,"_blank","noopener"); return; }
       if (act === "note"){ e.stopPropagation(); openNoteId = openNoteId===id?null:id; renderTiles(); return; }
       if (act === "close"){ e.stopPropagation(); openNoteId = null; renderTiles(); return; }
-      openUrl(p.login, true);
+      openPortal(p);
     };
-    t.onkeydown = e => { if(e.key==="Enter") t.click(); };
+    t.onkeydown = e => { if(e.key==="Enter") openPortal(p); };
   });
 }
 
-/* --- стартовая проверка сертификатов и зависимых программ --- */
+/* ---------- стартовая проверка ---------- */
 async function startupChecks(){
   const box = $("#startup");
+  if (!box) return;
   const recheck = `<button class="rechk" title="проверить ещё раз" onclick="startupChecks()">↻</button>`;
   box.innerHTML = `<span class="sp spin">⏳</span><div class="body"><b>Идёт проверка сертификатов и зависимых программ…</b></div>`;
   try{
@@ -333,8 +475,7 @@ async function startupChecks(){
       box.className = "startup ok";
       box.innerHTML = `<span class="sp">✅</span><div class="body"><b>Сертификаты и зависимые программы в порядке</b> · проверено в ${when}</div>${recheck}`;
     } else {
-      const cls = bad.length ? "fail" : "warn";
-      box.className = "startup "+cls;
+      box.className = "startup "+(bad.length?"fail":"warn");
       box.innerHTML = `<span class="sp">${bad.length?"🛑":"⚠️"}</span><div class="body">
         <b>${bad.length?"Есть проблемы, мешающие входу":"Проверка завершена с замечаниями"}</b> · ${when}
         <ul>${li(bad)}${li(warn)}</ul></div>${recheck}`;
@@ -364,28 +505,39 @@ async function runDiag(){
   }catch(e){ $("#diagStatus").textContent = "ошибка: "+e.message; }
 }
 
+/* ---------- init ---------- */
 async function load(){
   try{
     portals = await (await fetch("/api/portals")).json();
-    renderChips(); renderTiles();
+    renderChips(); renderTiles(); renderTabs();
     const meta = await (await fetch("/api/meta")).json();
-    $("#ver").textContent = "· v"+meta.version;
+    $("#ver").textContent = "v"+meta.version;
     $("#metaLine").textContent = `${meta.name} v${meta.version} · сборка: ${meta.os}/${meta.arch} · порталов в базе: ${portals.length}`;
     $("#footMeta").textContent = `${meta.name} v${meta.version} · вход — только на официальных сайтах`;
     statuses = await (await fetch("/api/status")).json();
     renderTiles();
-    startupChecks(); // при старте: сертификаты и зависимые программы
+    startupChecks();
   }catch(e){ toast("Ошибка загрузки: "+e.message); }
 }
 
 $("#q").addEventListener("input", renderTiles);
-document.addEventListener("keydown", e=>{ if(e.key==="/" && document.activeElement!==$("#q")){e.preventDefault();$("#q").focus();} });
-document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{
-  document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("on",x===b));
-  ["portals","setup","help"].forEach(t=>$("#sec-"+t).classList.toggle("sec-hidden", t!==b.dataset.tab));
+document.addEventListener("keydown", e=>{
+  if (e.key==="/" && document.activeElement!==$("#q")){ e.preventDefault(); activateTab("home"); $("#q").focus(); }
+  if (e.key==="Escape" && activeTabId!=="home"){ activateTab("home"); }
+});
+document.querySelectorAll(".tb-btn[data-sec]").forEach(b=>b.onclick=()=>{
+  activateTab("home");
+  homeSection = b.dataset.sec;
+  document.querySelectorAll(".tb-btn[data-sec]").forEach(x=>x.classList.toggle("on", x===b));
+  ["portals","setup","help"].forEach(s=>document.getElementById("sec-"+s).classList.toggle("sec-hidden", s!==homeSection));
 });
 $("#showIeSteps").onclick = e=>{ e.preventDefault(); $("#ieSteps").classList.toggle("sec-hidden"); };
 $("#runDiag").onclick = runDiag;
+$("#tbReload").onclick = ()=>{ const t=currentTab(); const fr=document.getElementById("fr-"+t.id); if(fr) fr.src = t.url; };
+$("#tbOutside").onclick = ()=>{ const t=currentTab(); if(t && !t.home) window.open(t.url,"_blank","noopener"); };
+
+/* heartbeat: приложение живёт, пока открыто это окно */
+setInterval(()=>{ fetch("/api/heartbeat").catch(()=>{}); }, 3000);
 
 load();
 </script>
