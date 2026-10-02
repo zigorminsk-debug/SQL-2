@@ -32,8 +32,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: gosportals/go.mod
-          cache: true
-          cache-dependency-path: gosportals/go.sum
+          cache: false # внешних зависимостей нет (чистый stdlib)
 
       - name: Проверка кода (vet + форматирование)
         shell: bash
