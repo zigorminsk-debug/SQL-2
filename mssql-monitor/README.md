@@ -49,7 +49,8 @@
 - Нет желания ставить Python? **GitHub Actions** запускает сборку автоматически при каждом
   `push` и `pull request`; её также можно запустить вручную во вкладке *Actions → Build Windows
   packages → Run workflow*. Готовые EXE появятся в Artifacts (workflow:
-  [`.github/workflows/build-windows.yml`](../.github/workflows/build-windows.yml)).
+  [`.github/workflows/build-windows.yml`](../.github/workflows/build-windows.yml)). Номер
+  версии в собранном EXE подставляется автоматически: `2.0.<номер запуска>.<попытка>`.
 
 Запуск из исходников без сборки: `python app.py`.
 

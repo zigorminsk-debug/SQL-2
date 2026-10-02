@@ -39,6 +39,8 @@ input:focus,select:focus{outline:2px solid #b6d0f0}
 button.primary{background:var(--acc);color:#fff;border:none;border-radius:9px;
  padding:9px 20px;font-size:14px;cursor:pointer;margin-top:12px}
 button.primary:hover{background:#15509b}
+button.secondary{background:#fff;color:var(--acc);border:1px solid #b6d0f0}
+button.secondary:hover{background:var(--acc2)}
 button.danger{background:#fff;color:var(--crit);border:1px solid var(--crit)}
 button:disabled{opacity:.5;cursor:default}
 .stats{display:flex;gap:12px;flex-wrap:wrap;margin:10px 0}
@@ -69,6 +71,11 @@ table.tbl tr:nth-child(even) td{background:#fafbfd}
 .rep-link{font-size:16px;padding:10px 16px;background:var(--acc2);
  border:1px solid #b6d0f0;border-radius:9px;display:inline-block;text-decoration:none;
  color:var(--acc);font-weight:600}
+.report-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.report-actions button{margin-top:0}
+button.report-send{margin:0;border:0;background:none;color:var(--acc);padding:0;font:inherit;
+ cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+button.report-send:hover{color:#124783}
 .contact-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}
 .contact-card{background:#f7faff;border:1px solid #d6e4f4;border-radius:10px;padding:14px 16px}
 .contact-card h3{margin:0 0 7px;color:#24476f}
@@ -199,8 +206,15 @@ footer a{color:inherit;text-decoration:underline;text-underline-offset:2px}
       <div class="progress" id="r-prog" style="display:none"><div></div></div>
       <button class="primary" id="b-rep">Сформировать отчёт</button>
       <div id="r-done" style="margin-top:14px;display:none">
-        <a class="rep-link" id="r-link" href="#" target="_blank">Открыть отчёт ↗</a>
+        <div class="report-actions">
+          <a class="rep-link" id="r-link" href="#" target="_blank">Открыть отчёт ↗</a>
+          <a class="rep-link" id="r-download" href="#" download>Скачать HTML</a>
+          <button class="primary secondary" id="b-report-send" type="button">Отправить отчёт</button>
+        </div>
         <p class="muted small" id="r-summary"></p>
+        <p class="muted small">Кнопка «Отправить отчёт» передаёт HTML-файл через системное
+        меню «Поделиться». Если браузер не поддерживает вложения, откроется письмо на
+        <a href="mailto:info@csl.by">info@csl.by</a> — прикрепите к нему скачанный HTML-файл.</p>
       </div>
     </div>
     <div class="card">
@@ -432,6 +446,7 @@ function renderReport(st){
   if(st.report_path){
     $('r-done').style.display = '';
     $('r-link').href = st.report_path;
+    $('r-download').href = st.report_path;
     $('r-summary').textContent = st.report_msg || '';
   }
   if(run && !reportPoll){ reportPoll = setInterval(pollReport, 1500); }
@@ -455,11 +470,42 @@ function loadReportsList(){
       ? '<table class="tbl"><thead><tr><th>Файл</th><th>Размер</th><th></th></tr></thead><tbody>'
         + list.map(r => '<tr><td>' + r.name + '</td><td>' +
           Math.round(r.size / 1024) + ' КБ</td><td><a href="' + r.url +
-          '" target="_blank">открыть ↗</a></td></tr>').join('')
+          '" target="_blank">открыть ↗</a> · <button class="report-send" type="button" data-report-url="' +
+          r.url + '">отправить</button></td></tr>').join('')
         + '</tbody></table>'
       : '<p class="muted">Отчётов ещё нет.</p>';
   });
 }
+
+// ---------- отправка отчёта ----------
+async function sendReport(url){
+  if(!url || url === '#'){ return; }
+  const reportURL = new URL(url, window.location.href);
+  const fileName = decodeURIComponent(reportURL.pathname.split('/').pop() || 'mssql-report.html');
+  const text = 'Отчёт MS SQL Monitor: ' + fileName;
+  try {
+    const response = await fetch(reportURL.href);
+    if(!response.ok){ throw new Error('Не удалось прочитать отчёт'); }
+    const file = new File([await response.blob()], fileName, {type:'text/html'});
+    const shareData = {title:'Отчёт MS SQL Monitor', text:text, files:[file]};
+    if(navigator.share && (!navigator.canShare || navigator.canShare(shareData))){
+      await navigator.share(shareData);
+      return;
+    }
+  } catch(e) {
+    if(e && e.name === 'AbortError'){ return; }
+    console.warn('Отправка через системное меню недоступна:', e);
+  }
+  alert('Браузер не поддерживает отправку HTML-файла как вложения. Откроется письмо на info@csl.by — прикрепите к нему скачанный отчёт.');
+  const subject = encodeURIComponent('Отчёт MS SQL Monitor — ' + fileName);
+  const body = encodeURIComponent('Здравствуйте!\n\nНаправляю отчёт MS SQL Monitor. HTML-файл приложен к письму.\n\n' + text);
+  window.location.href = 'mailto:info@csl.by?subject=' + subject + '&body=' + body;
+}
+$('b-report-send').onclick = () => sendReport($('r-link').getAttribute('href'));
+$('r-list').onclick = e => {
+  const button = e.target.closest('button[data-report-url]');
+  if(button){ sendReport(button.dataset.reportUrl); }
+};
 
 // ---------- настройки ----------
 $('b-save').onclick = () => api('/api/settings', {

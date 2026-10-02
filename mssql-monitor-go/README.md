@@ -101,8 +101,9 @@ Workflow [`.github/workflows/build-windows.yml`](../.github/workflows/build-wind
 запускается автоматически при каждом `push` и `pull request`; его также можно запустить вручную
 во вкладке **Actions → Build Windows packages → Run workflow**. Он выполняет `go vet` и
 `go test`, собирает GUI- и CLI-версии Go для Windows, а также проверяет и собирает Python-версию.
-Готовые файлы доступны в Artifacts: `mssql-monitor-go-windows` и
-`mssql-monitor-python-windows` (хранятся 14 дней).
+Готовые файлы доступны в Artifacts: `mssql-monitor-go-windows-v2.0.*` и
+`mssql-monitor-python-windows-v2.0.*` (хранятся 14 дней). Номер версии в шапке
+каждого EXE формируется автоматически: `2.0.<номер запуска>.<попытка>`.
 
 ## Структура исходников
 

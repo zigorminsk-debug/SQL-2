@@ -9,7 +9,9 @@ import (
 	"time"
 )
 
-const Version = "2.0.0"
+// Version заменяется в GitHub Actions через -ldflags для каждой сборки.
+// Локальная сборка использует базовую версию.
+var Version = "2.0.0"
 const AppTitle = "MS SQL Monitor — контроль и оптимизация SQL Server"
 
 type Config struct {

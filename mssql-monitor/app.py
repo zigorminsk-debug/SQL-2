@@ -27,6 +27,8 @@ import threading
 import time
 import webbrowser
 
+from version import VERSION
+
 import analysis
 import checks
 import demo
@@ -35,7 +37,6 @@ from db import Database
 from monitor import MonitorEngine
 from storage import Storage
 
-VERSION = "1.0.0"
 APP_TITLE = "MS SQL Monitor — контроль и оптимизация SQL Server"
 
 log = logging.getLogger("app")
