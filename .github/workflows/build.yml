@@ -59,10 +59,14 @@ jobs:
         run: |
           cd release && sha256sum GosPortalyRB.exe gosportals-linux | tee SHA256SUMS.txt
 
+      - name: Безопасное имя артефакта (без слэшей)
+        shell: bash
+        run: echo "SAFE_REF=${GITHUB_REF_NAME//\//-}" >> "$GITHUB_ENV"
+
       - name: Публикация артефактов сборки
         uses: actions/upload-artifact@v4
         with:
-          name: GosPortalyRB-${{ github.ref_name }}
+          name: GosPortalyRB-${{ env.SAFE_REF }}
           path: |
             gosportals/release/GosPortalyRB.exe
             gosportals/release/gosportals-linux
