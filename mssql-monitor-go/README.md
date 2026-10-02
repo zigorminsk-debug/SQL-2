@@ -37,8 +37,8 @@
 ## Консольный режим
 
 ```bat
-MSSQLMonitorCLI.exe -server SRV-SQL\SQL2022 -windows -hours 8 -interval 30
-MSSQLMonitorCLI.exe -server 10.0.0.5 -user sa -password *** -database master
+MSSQLMonitorCLI.exe -server SRV-SQL\SQL2022 -auth windows -hours 8 -interval 30
+MSSQLMonitorCLI.exe -server 10.0.0.5 -auth sql -user sa -password *** -database master
 MSSQLMonitorCLI.exe -demo-report            &rem демо-отчёт без сервера
 ```
 
@@ -80,6 +80,13 @@ GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath \
 Иконка/манифест: `rsrc -arch amd64 -ico icon.ico -manifest app.manifest
 -o rsrc_windows_amd64.syso` (файл `.syso` подхватывается сборкой Windows
 автоматически).
+
+## Сборка в облаке (без установки Go)
+
+В `.github/workflows/build-windows.yml` настроена автоматическая сборка:
+загрузите каталог проекта в репозиторий GitHub — во вкладке **Actions**
+появятся готовые `MSSQLMonitor.exe` и `MSSQLMonitorCLI.exe` (Artifacts),
+а также прогон `go vet`, `gofmt` и дымового демо-отчёта.
 
 ## Структура исходников
 

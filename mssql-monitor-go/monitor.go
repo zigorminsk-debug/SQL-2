@@ -139,3 +139,10 @@ func (e *MonitorEngine) Alive() bool {
 		return true
 	}
 }
+
+// Stats — потокобезопасное чтение счётчиков (тики, ошибки опроса).
+func (e *MonitorEngine) Stats() (samples, errors int) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.Samples, e.Errors
+}

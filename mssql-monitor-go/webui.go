@@ -82,6 +82,7 @@ func writeErr(w http.ResponseWriter, code int, msg string) {
 
 func (a *App) handleState(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
+	cfgCopy := *a.cfg
 	out := map[string]any{
 		"version":    Version,
 		"connected":  a.db != nil,
@@ -90,7 +91,7 @@ func (a *App) handleState(w http.ResponseWriter, r *http.Request) {
 		"driver":     "",
 		"monitor_on": a.monitor != nil && a.monitor.Alive(),
 		"monitor_n":  0,
-		"config":     a.cfg,
+		"config":     cfgCopy,
 	}
 	if a.db != nil {
 		out["server"] = a.db.ServerName()
@@ -153,7 +154,9 @@ func (a *App) handleConnect(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, "укажите сервер")
 		return
 	}
+	a.mu.Lock()
 	cfg := *a.cfg
+	a.mu.Unlock()
 	cfg.Server = strings.TrimSpace(req.Server)
 	cfg.Port = req.Port
 	if cfg.Port == 0 {
@@ -186,8 +189,10 @@ func (a *App) handleConnect(w http.ResponseWriter, r *http.Request) {
 			err.Error())
 		return
 	}
+	a.mu.Lock()
 	*a.cfg = cfg
-	a.cfg.Save()
+	a.mu.Unlock()
+	cfg.Save()
 	a.Connect(db)
 	a.log.Infof("Подключено: %s (база: %s)", db.ServerName(), cfg.Database)
 	writeJSON(w, map[string]any{"ok": true, "server": db.ServerName(), "demo": false})
@@ -237,12 +242,18 @@ func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
 		if in.PlanXML != nil {
 			a.cfg.PlanXMLCheck = *in.PlanXML
 		}
+		snapshot := *a.cfg
 		a.mu.Unlock()
-		a.cfg.Save()
+		snapshot.Save()
 		a.log.Infof("Настройки сохранены: интервал %d с, длительность %d ч",
-			a.cfg.Interval, a.cfg.DurationHours)
+			snapshot.Interval, snapshot.DurationHours)
+		writeJSON(w, snapshot)
+		return
 	}
-	writeJSON(w, a.cfg)
+	a.mu.Lock()
+	snapshot := *a.cfg
+	a.mu.Unlock()
+	writeJSON(w, snapshot)
 }
 
 func (a *App) handleMonitorStart(w http.ResponseWriter, r *http.Request) {
@@ -263,7 +274,9 @@ func (a *App) handleMonitorStart(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, "не удалось открыть хранилище данных")
 		return
 	}
-	cfg := a.cfg
+	a.mu.Lock()
+	cfg := *a.cfg // копия под замком: настройки могут меняться из другого запроса
+	a.mu.Unlock()
 	eng := NewMonitorEngine(db, st, time.Duration(cfg.Interval)*time.Second,
 		time.Duration(cfg.DurationHours)*time.Hour, cfg.LongQueryS)
 	eng.OnLog = func(msg string) { a.log.Infof("%s", msg) }
@@ -357,6 +370,7 @@ func (a *App) runReport(reason string) {
 		a.mu.Lock()
 		opts := CheckOptions{Fragmentation: a.cfg.FragCheck,
 			ErrorLog: a.cfg.ErrorLogCheck, PlanXML: a.cfg.PlanXMLCheck}
+		interval := a.cfg.Interval
 		a.mu.Unlock()
 		t := time.Now()
 		stx := a.Store()
@@ -383,7 +397,7 @@ func (a *App) runReport(reason string) {
 			ServerDisplay: db.ServerName(),
 			ServerFull:    db.ServerName(),
 			GeneratedStr:  time.Now().Format("02.01.2006 15:04:05"),
-			Interval:      a.cfg.Interval,
+			Interval:      interval,
 			Driver:        db.DriverName(),
 		}
 		html, health, findings, _ := BuildReport(deep, samples, blocking, longq, meta)

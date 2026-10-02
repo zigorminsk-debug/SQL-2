@@ -201,14 +201,15 @@ func runCLI(fs *flag.FlagSet, fServer *string, fPort *int, fDatabase *string,
 				break loop
 			case <-tick.C:
 				pct := int(float64(time.Since(eng.Started)) / float64(dur) * 100)
+				samples, _ := eng.Stats()
 				if pct >= lastPct+10 && pct < 100 {
-					fmt.Printf("  … %d%% (тиков: %d)\n", pct, eng.Samples)
+					fmt.Printf("  … %d%% (тиков: %d)\n", pct, samples)
 					lastPct = pct
 				}
 			}
 		}
-		fmt.Printf("Мониторинг завершён: тиков %d, ошибок %d\n",
-			eng.Samples, eng.Errors)
+		samples, errors := eng.Stats()
+		fmt.Printf("Мониторинг завершён: тиков %d, ошибок %d\n", samples, errors)
 	}
 
 	fmt.Println("Глубокая диагностика и построение отчёта…")
