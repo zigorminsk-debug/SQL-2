@@ -72,6 +72,10 @@ jobs:
               assert struct.unpack_from("<H", b, off+92)[0] == sub, p
               print(f"{p}: PE32+ x64, {'GUI (без консоли)' if sub == 2 else 'консольная'}, {len(b)/1048576:.1f} МБ")
           PY
+          # проверка: порядковый номер сборки действительно внедрён в бинарники
+          grep -aq "$VER" release/MSSQLMonitor.exe && grep -aq "$VER" release/MSSQLMonitorCLI.exe \
+            && echo "номер версии $VER подтверждён в обоих бинарниках" \
+            || { echo "ОШИБКА: версия $VER не найдена в бинарнике"; exit 1; }
           ( cd release && zip -9 "MSSQLMonitor-$VER-win64.zip" \
               MSSQLMonitor.exe MSSQLMonitorCLI.exe demo_report.html )
           sha256sum release/MSSQLMonitor.exe release/MSSQLMonitorCLI.exe
@@ -104,6 +108,7 @@ jobs:
             echo "| | |"
             echo "|---|---|"
             echo "| Версия | \`$VER\` |"
+            echo "| Версия в бинарнике | \`$VER\` — проверена на CI |"
             echo "| Ветка | \`$GITHUB_REF_NAME\` |"
             echo "| Коммит | \`$GITHUB_SHA\` |"
             echo
