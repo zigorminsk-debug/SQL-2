@@ -1342,10 +1342,16 @@ func (r *Report) footer() string {
 <p class='muted small'>Недостающие права не ломают отчёт — недоступные проверки отмечаются
 в сводке. Инструмент ничего не изменяет на сервере.</p>
 </div>
+<div class='support-links'>
+ <b>Разработчик:</b> <a href='tel:+375293371412'>Zakharevich Igor · +375 (29) 337-14-12</a><br>
+ <b>Контакты и поддержка:</b> <a href='https://csl.by/' target='_blank' rel='noopener noreferrer'>csl.by</a> ·
+ <a href='mailto:info@csl.by'>info@csl.by</a> ·
+ <a href='https://csl.by/contacts/' target='_blank' rel='noopener noreferrer'>г. Минск, ул. Фабрициуса, 9</a> ·
+ Пн–Пт 09:00–17:00
 </div>
 </section>
 <footer>Сформировано MS SQL Monitor (Go) · ` + esc(r.meta.GeneratedStr) +
-		" · Данные: DMV Microsoft SQL Server</footer>"
+		" · Данные: DMV Microsoft SQL Server · <a href='https://csl.by/' target='_blank' rel='noopener noreferrer'>csl.by</a></footer>"
 }
 
 func (r *Report) body() string {

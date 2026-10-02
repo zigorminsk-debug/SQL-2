@@ -10,6 +10,9 @@
 *{box-sizing:border-box}
 body{margin:0;font:14px/1.5 "Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
  background:var(--bg);color:var(--tx)}
+a{color:var(--acc)}
+a:hover{color:#124783}
+a:focus-visible{outline:2px solid #f9a825;outline-offset:2px;border-radius:2px}
 header{background:linear-gradient(135deg,#123a75,#1a5fb4);color:#fff;padding:14px 22px;
  display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
 header h1{font-size:18px;margin:0;font-weight:600}
@@ -66,7 +69,17 @@ table.tbl tr:nth-child(even) td{background:#fafbfd}
 .rep-link{font-size:16px;padding:10px 16px;background:var(--acc2);
  border:1px solid #b6d0f0;border-radius:9px;display:inline-block;text-decoration:none;
  color:var(--acc);font-weight:600}
+.contact-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}
+.contact-card{background:#f7faff;border:1px solid #d6e4f4;border-radius:10px;padding:14px 16px}
+.contact-card h3{margin:0 0 7px;color:#24476f}
+.contact-card p{margin:5px 0}
+.contact-list{list-style:none;padding:0;margin:7px 0 0}
+.contact-list li{margin:5px 0}
+.service-links{margin:14px 0 0;font-size:13px}
+.service-links a{display:inline-block;margin:3px 10px 3px 0}
 footer{text-align:center;color:var(--mut);font-size:12px;margin:22px 0}
+footer a{color:inherit;text-decoration:underline;text-underline-offset:2px}
+@media(max-width:640px){.contact-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -250,11 +263,39 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin:22px 0}
       </ul>
       <p class="muted small">Реализация на Go, один исполняемый файл, без установки.
       Веб-интерфейс работает на локальном адресе этого компьютера.</p>
+      <div class="contact-grid">
+        <section class="contact-card" aria-labelledby="developer-title">
+          <h3 id="developer-title">Разработчик</h3>
+          <p><b>Zakharevich Igor</b></p>
+          <p><a href="tel:+375293371412" aria-label="Позвонить разработчику Zakharevich Igor">+375 (29) 337-14-12</a></p>
+        </section>
+        <section class="contact-card" aria-labelledby="support-title">
+          <h3 id="support-title">Контакты и поддержка</h3>
+          <ul class="contact-list">
+            <li><a href="https://csl.by/" target="_blank" rel="noopener noreferrer">csl.by</a></li>
+            <li><a href="https://csl.by/contacts/" target="_blank" rel="noopener noreferrer">г. Минск, ул. Фабрициуса, 9</a></li>
+            <li><a href="tel:+375293371412" aria-label="Позвонить по номеру поддержки">+375 (29) 337-14-12</a></li>
+            <li><a href="mailto:info@csl.by">info@csl.by</a></li>
+            <li>Понедельник — пятница, 09:00–17:00</li>
+          </ul>
+        </section>
+      </div>
+      <p class="service-links muted small">Услуги:
+        <a href="https://csl.by/services/administration/" target="_blank" rel="noopener noreferrer">системное администрирование</a>
+        <a href="https://csl.by/services/print/" target="_blank" rel="noopener noreferrer">заправка картриджей</a>
+        <a href="https://csl.by/services/repair/" target="_blank" rel="noopener noreferrer">ремонт оргтехники</a>
+        <a href="https://csl.by/services/telephony/" target="_blank" rel="noopener noreferrer">настройка АТС</a>
+        <a href="https://csl.by/services/repair/electronics/" target="_blank" rel="noopener noreferrer">ремонт промышленной электроники</a>
+        <a href="https://csl.by/services/repair/miners/" target="_blank" rel="noopener noreferrer">ремонт майнеров</a>
+        <a href="https://csl.by/services/cctv/" target="_blank" rel="noopener noreferrer">видеонаблюдение и СКУД</a>
+      </p>
       <button class="primary danger" id="b-exit">Завершить программу</button>
     </div>
   </div>
 </main>
-<footer>MS SQL Monitor (Go) · данные: DMV Microsoft SQL Server</footer>
+<footer>MS SQL Monitor (Go) · данные: DMV Microsoft SQL Server ·
+  <a href="https://csl.by/" target="_blank" rel="noopener noreferrer">csl.by</a> ·
+  <a href="tel:+375293371412" aria-label="Позвонить разработчику Zakharevich Igor">Zakharevich Igor: +375 (29) 337-14-12</a></footer>
 
 <script>
 let lastLogSeq = 0, stateTimer = null, logTimer = null;

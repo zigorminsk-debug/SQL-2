@@ -58,6 +58,20 @@ MSSQLMonitorCLI.exe -demo-report            &rem демо-отчёт без се
 - Веб-GUI слушает только `127.0.0.1` (доступ с других машин по умолчанию
   запрещён; `0.0.0.0` — явным флагом `-host`, на свой страх и риск).
 
+## Контакты и поддержка
+
+- Разработчик: **Zakharevich Igor** — [позвонить: +375 (29) 337-14-12](tel:+375293371412).
+- Сайт поддержки: [csl.by](https://csl.by/); [электронная почта](mailto:info@csl.by).
+- Адрес: [г. Минск, ул. Фабрициуса, 9](https://csl.by/contacts/).
+- Время работы: понедельник–пятница, 09:00–17:00.
+- Услуги: [системное администрирование](https://csl.by/services/administration/),
+  [заправка картриджей](https://csl.by/services/print/),
+  [ремонт оргтехники](https://csl.by/services/repair/),
+  [настройка АТС](https://csl.by/services/telephony/),
+  [ремонт промышленной электроники](https://csl.by/services/repair/electronics/),
+  [ремонт майнеров](https://csl.by/services/repair/miners/) и
+  [видеонаблюдение и СКУД](https://csl.by/services/cctv/).
+
 ## Сборка из исходников
 
 Требуется Go 1.21+:

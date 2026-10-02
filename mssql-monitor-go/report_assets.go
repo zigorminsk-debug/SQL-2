@@ -112,6 +112,9 @@ pre.sql{background:#10212f;color:#d7e4f0;border-radius:8px;padding:10px 14px;ove
 .filters button{border:1px solid var(--bd);background:#fff;border-radius:8px;padding:4px 12px;
  cursor:pointer;font-size:12.5px}
 .filters button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.support-links{margin-top:16px;padding-top:12px;border-top:1px solid var(--bd);color:var(--mut);font-size:12.5px;line-height:1.8}
+.support-links a,footer a{color:var(--acc);text-decoration:underline;text-underline-offset:2px}
+.support-links a:hover,footer a:hover{color:#124783}
 footer{text-align:center;color:var(--mut);font-size:12px;margin:20px 0}
 @media print{.no-print{display:none}body{background:#fff}.card{box-shadow:none;
  page-break-inside:avoid}nav.nav{display:none}}
