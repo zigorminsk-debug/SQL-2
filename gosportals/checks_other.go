@@ -41,9 +41,16 @@ func runEnvironmentChecks() []Check {
 		ID:       "avest",
 		Title:    "Криптопровайдер AVEST CSP",
 		Status:   "warn",
-		Detail:   "Проверка доступна только в Windows-версии приложения. Нужен для входа по ЭЦП (МНС, ФСЗН, Минфин, Белгосстрах).",
+		Detail:   "Проверка доступна только в Windows-версии приложения. Нужен для входа по ЭЦП (МНС, ЭСЧФ, ФСЗН, Минфин, Белгосстрах, ЕГР).",
 		FixLabel: "avest.by",
-		FixURL:   "https://avest.by",
+		FixURL:   "https://www.avest.by/crypto/csp.htm",
+	}, Check{
+		ID:       "ntclient",
+		Title:    "NTClientSoftware (Е-ПАСЛУГА / ЕПЭУ)",
+		Status:   "warn",
+		Detail:   "Проверка доступна только в Windows-версии. Нужен для входа по ЭЦП/ID-карте на Единый портал электронных услуг и Е-ПАСЛУГА.",
+		FixLabel: "nces.by",
+		FixURL:   "https://nces.by/service/po/",
 	}, Check{
 		ID:       "certs",
 		Title:    "Корневые сертификаты НУЦ / ГосСУОК",

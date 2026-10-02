@@ -118,27 +118,30 @@ func main() {
 	addr := flag.String("addr", "127.0.0.1", "адрес прослушивания веб-панели (127.0.0.1 — только этот компьютер)")
 	port := flag.Int("port", 0, "порт веб-панели (0 — выбрать свободный автоматически)")
 	noOpen := flag.Bool("no-open", false, "не открывать окно/браузер автоматически")
-	web := flag.Bool("web", false, "открыть панель в обычном браузере (вкладка) вместо отдельного окна приложения")
+	web := flag.Bool("web", false, "(устарело) то же, что режим по умолчанию")
+	appMode := flag.Bool("app", false, "окно без интерфейса браузера (app-режим Edge/Chrome), порталы — во встроенных вкладках")
 	native := flag.Bool("native", false, "нативный Win32-GUI (таблица, меню, трей) вместо окна приложения")
 	flag.Parse()
+	_ = web
 
 	mustLoadData()
 
 	switch {
-	case *web || runtime.GOOS != "windows":
-		// Веб-панель в обычном браузере (по умолчанию на Linux/macOS).
-		runServer(*addr, *port, *noOpen, nil, "", false)
 	case *native:
-		// Нативный GUI на walk; при ошибке — падать в режим окна приложения.
+		// Нативный GUI на walk; при ошибке — падать в режим браузера.
 		if err := runGUI(); err != nil {
-			fmt.Fprintf(os.Stderr, "нативный GUI недоступен (%v)\nЗапускаю окно приложения…\n", err)
-			runServer(*addr, *port, *noOpen, openAppWindow, "?embed=1", true)
+			fmt.Fprintf(os.Stderr, "нативный GUI недоступен (%v)\nЗапускаю окно браузера…\n", err)
+			runServer(*addr, *port, *noOpen, openBrowser, "", true)
 		}
-	default:
-		// Режим по умолчанию (Windows): единое окно приложения с карточками,
-		// вкладки внутри окна; консоль скрывается; программа завершается
-		// по закрытию главного окна.
+	case *appMode:
+		// Окно приложения без браузерного интерфейса (Edge/Chrome --app),
+		// порталы открываются во встроенных вкладках этого окна.
 		runServer(*addr, *port, *noOpen, openAppWindow, "?embed=1", true)
+	default:
+		// Режим по умолчанию (все ОС): отдельное окно браузера со стартовой
+		// страницей; все порталы открываются ВКЛАДКАМИ в этом же окне.
+		// Программа завершается, когда окно закрыто (heartbeat).
+		runServer(*addr, *port, *noOpen, openBrowser, "", true)
 	}
 }
 

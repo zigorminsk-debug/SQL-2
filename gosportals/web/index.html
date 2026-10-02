@@ -23,6 +23,8 @@
   .tbwrap{max-width:100%;padding:8px 14px;display:flex;gap:12px;align-items:center}
   .logo{width:32px;height:32px;flex:0 0 32px;border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--red);font-size:13px;box-shadow:var(--shadow)}
   .apptitle{font-weight:800;font-size:15px;white-space:nowrap}
+  .slogan{font-size:11.8px;font-style:italic;opacity:.93;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  body:not(.embed) .tabstrip,body:not(.embed) .toolbar{display:none!important}
   .tb-nav{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
   .tb-nav .search{position:relative}
   .tb-nav input{width:240px;max-width:40vw;padding:6px 10px 6px 30px;border-radius:8px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.15);color:#fff;outline:none;font-size:12.5px}
@@ -158,8 +160,11 @@
 <body>
   <div class="titlebar">
     <div class="tbwrap">
-      <div class="logo">БЯ</div>
-      <div class="apptitle">ГосПорталы РБ <span id="ver" style="font-weight:400;font-size:11px;opacity:.85"></span></div>
+      <div class="logo">КБ</div>
+      <div>
+        <div class="apptitle">ГосПорталы РБ <span id="ver" style="font-weight:400;font-size:11px;opacity:.85"></span></div>
+        <div class="slogan">ООО «Компьютерная безопасность» — «Ваш комфорт — наша забота»</div>
+      </div>
       <div class="tb-nav">
         <div class="search">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -196,7 +201,6 @@
             <div class="cmark">КБ</div>
             <div>
               <div class="cname">ООО «Компьютерная безопасность»</div>
-              <div class="croll">«Ваш комфорт — наша забота»</div>
             </div>
           </div>
           <div class="cgrid">
@@ -222,12 +226,16 @@
         <div class="panel">
           <h2>Что нужно для входа по ЭЦП</h2>
           <div class="tools">
-            <div class="tool"><h3>1. Криптопровайдер AVEST CSP</h3><p>Национальное СКЗИ: без него не работают МНС, ФСЗН, Минфин, Белгосстрах, Белстат по ЭЦП.</p><a href="https://avest.by" target="_blank" rel="noopener">avest.by → скачать/обновить</a></div>
+            <div class="tool"><h3>1. Криптопровайдер AVEST CSP</h3><p>Национальное СКЗИ: без него не работают МНС, ЭСЧФ, ФСЗН, Минфин, Белгосстрах, ЕГР, маркировка по ЭЦП.</p><a href="https://www.avest.by/crypto/csp.htm" target="_blank" rel="noopener">avest.by → скачать/обновить AVEST CSP</a></div>
             <div class="tool"><h3>2. Сертификат ключа ЭЦП</h3><p>Выдаётся удостоверяющим центром (РУЦ ОСТ, НУЦ, ГосСУОК). Носитель — токен/флешка AVEST.</p><a href="https://nca.by" target="_blank" rel="noopener">nca.by →</a></div>
             <div class="tool"><h3>3. Корневые сертификаты НУЦ / ГосСУОК</h3><p>Ставятся в «Доверенные корневые» Windows. Следите за сроками — приложение подскажет об истечении.</p><a href="https://nca.by" target="_blank" rel="noopener">nca.by</a> · <a href="https://gosuok.gov.by" target="_blank" rel="noopener">gosuok.gov.by</a></div>
             <div class="tool"><h3>4. AvTuneProxy (вход «без ЭЦП»)</h3><p>Нужен только для ФСЗН при входе по логину МСИ вместо ЭЦП.</p><a href="https://avtunproxy.by/windows/" target="_blank" rel="noopener">avtunproxy.by → скачать</a></div>
             <div class="tool"><h3>5. Браузер с режимом IE</h3><p>МНС (физическая ЭЦП) и «Электронный респондент» Белстата работают в IE 11 / Edge в режиме IE. Если портал запрещает встроенные вкладки — он откроется отдельным окном автоматически.</p><a href="#" id="showIeSteps">инструкция ↓</a></div>
             <div class="tool"><h3>6. Токен с драйвером</h3><p>Носитель виден в «Диспетчере сертификатов» (AvCertMgr) после установки AVEST CSP.</p><a href="https://avest.by" target="_blank" rel="noopener">документация →</a></div>
+            <div class="tool"><h3>7. NTClientSoftware (Е-ПАСЛУГА / ЕПЭУ)</h3><p>Обязателен для входа в «Единый портал» и Е-ПАСЛУГА по ЭЦП/ID-карте. Там же — G-SecTLS Client для ID-карт.</p><a href="https://nces.by/service/po/" target="_blank" rel="noopener">nces.by → скачать</a></div>
+            <div class="tool"><h3>8. АРМ Плательщик (МНС, офлайн)</h3><p>Подготовка налоговых деклараций без интернета с последующей выгрузкой в ЛК МНС.</p><a href="https://nalog.gov.by/software/arm-payer/" target="_blank" rel="noopener">nalog.gov.by → скачать</a></div>
+            <div class="tool"><h3>9. Программа «Ввод ДПУ» (ФСЗН)</h3><p>Офлайн-подготовка документов персонифицированного учёта (ПУ-3 и др.).</p><a href="https://www.ssf.gov.by/ru/po-fonda-ru/" target="_blank" rel="noopener">ssf.gov.by → скачать</a></div>
+            <div class="tool"><h3>10. NCM Crypto Plugin (электронные торги)</h3><p>Плагин подписи для электронных процедур на goszakupki.by и торговых площадках.</p><a href="https://goszakupki.by/download/" target="_blank" rel="noopener">goszakupki.by → скачать</a></div>
           </div>
           <div id="ieSteps" class="sec-hidden" style="margin-top:12px">
             <div class="panel" style="margin:0;background:#fafbfc">
@@ -255,10 +263,10 @@
         <div class="panel">
           <h2>Как работать</h2>
           <ol class="steps">
-            <li>При запуске приложение <b>само проверяет сертификаты и зависимые программы</b> — результат в полосе сверху списка порталов.</li>
-            <li>Клик по плитке открывает портал <b>в новой вкладке внутри этого окна</b>; переключение — по полосе вкладок (⌂ Главная всегда слева). Длинные названия сокращаются аббревиатурой — наведите мышь для полного.</li>
-            <li>Если портал запрещает встроенные вкладки (защита сайта) — он откроется отдельным окном браузера автоматически.</li>
-            <li>Приложение завершается само, когда главное окно закрыто.</li>
+            <li>При запуске приложение открывает <b>стартовую страницу в отдельном окне вашего браузера</b> и само проверяет сертификаты и зависимые программы — результат в полосе сверху списка порталов.</li>
+            <li>Клик по плитке открывает портал <b>новой вкладкой в этом же окне браузера</b> — все порталы всегда под рукой, стартовая вкладка «ГосПорталы РБ» не закрывается.</li>
+            <li>Если вкладка не открылась, браузер мог заблокировать всплывание — разрешите его для этой страницы (значок в адресной строке).</li>
+            <li>Когда окно со вкладками закрыто, само консольное приложение завершается автоматически (~30 секунд).</li>
           </ol>
         </div>
         <div class="panel">
@@ -282,9 +290,10 @@
 const MAX_TABS = 10;
 const CATS = {
   report:"🧾 Налоги и отчётность", citizen:"👤 Гражданам", ved:"🚛 ВЭД и таможня",
-  torg:"🏗 Закупки и торги", service:"🏛 Госуслуги и идентификация", ref:"📚 Справочные"
+  torg:"🏗 Закупки и торги", service:"🏛 Госуслуги и идентификация",
+  edo:"📝 ЭДО и документооборот", ref:"📚 Справочные"
 };
-const CATGLYPH = {report:"🧾", citizen:"👤", ved:"🚛", torg:"🏗", service:"🏛", ref:"📚"};
+const CATGLYPH = {report:"🧾", citizen:"👤", ved:"🚛", torg:"🏗", service:"🏛", edo:"📝", ref:"📚"};
 const AUTH = {ecp:["ЭЦП","ecp"], mecp:["МЭЦП","mecp"], msi:["МСИ","msi"], lp:["Логин/пароль","lp"], esa:["ЕСА","esa"], ref:["Справочно","ref"]};
 
 let portals = [], statuses = {}, activeCat = "all", openNoteId = null;
@@ -352,6 +361,13 @@ function activateTab(id){
 }
 
 async function openPortal(p){
+  // Режим по умолчанию: все порталы — родными вкладками этого же окна браузера.
+  if (!EMBED){
+    const w = window.open(p.login, "_blank");
+    if (w){ w.opener = null; toast(`«${p.name}» — открыто во вкладке этого окна`); }
+    else toast("Браузер заблокировал новую вкладку — разрешите всплывающие окна для этой страницы");
+    return;
+  }
   const existing = tabs.find(t=>t.id===p.id);
   if (existing){ activateTab(p.id); return; }
   if (tabs.length >= MAX_TABS){ toast("Открыто много вкладок — закройте пару вкладок порталов"); return; }
@@ -508,8 +524,9 @@ async function runDiag(){
 /* ---------- init ---------- */
 async function load(){
   try{
+    document.body.classList.toggle("embed", EMBED);
     portals = await (await fetch("/api/portals")).json();
-    renderChips(); renderTiles(); renderTabs();
+    renderChips(); renderTiles(); if (EMBED) renderTabs();
     const meta = await (await fetch("/api/meta")).json();
     $("#ver").textContent = "v"+meta.version;
     $("#metaLine").textContent = `${meta.name} v${meta.version} · сборка: ${meta.os}/${meta.arch} · порталов в базе: ${portals.length}`;
@@ -522,8 +539,8 @@ async function load(){
 
 $("#q").addEventListener("input", renderTiles);
 document.addEventListener("keydown", e=>{
-  if (e.key==="/" && document.activeElement!==$("#q")){ e.preventDefault(); activateTab("home"); $("#q").focus(); }
-  if (e.key==="Escape" && activeTabId!=="home"){ activateTab("home"); }
+  if (e.key==="/" && document.activeElement!==$("#q")){ e.preventDefault(); if (EMBED) activateTab("home"); $("#q").focus(); }
+  if (e.key==="Escape" && EMBED && activeTabId!=="home"){ activateTab("home"); }
 });
 document.querySelectorAll(".tb-btn[data-sec]").forEach(b=>b.onclick=()=>{
   activateTab("home");

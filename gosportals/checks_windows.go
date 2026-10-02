@@ -24,6 +24,7 @@ func runEnvironmentChecks() []Check {
 		checkEdge(),
 		checkAvest(),
 		checkAvTune(),
+		checkNTClient(),
 		checkCerts(),
 	}
 	return checks
@@ -98,7 +99,7 @@ func regSzValue(line string) string {
 func checkAvest() Check {
 	c := Check{
 		ID: "avest", Title: "Криптопровайдер AVEST CSP",
-		FixLabel: "Скачать актуальный с avest.by", FixURL: "https://avest.by",
+		FixLabel: "Скачать актуальный с avest.by", FixURL: "https://www.avest.by/crypto/csp.htm",
 	}
 	if app, ok := installedLike("avest"); ok {
 		c.Status = "ok"
@@ -106,10 +107,32 @@ func checkAvest() Check {
 		if app.version != "" {
 			v = ", версия " + app.version
 		}
-		c.Detail = "Установлен: " + app.name + v + ". Нужен для входа по ЭЦП (МНС, ФСЗН, Минфин, Белгосстрах). Обновления — на avest.by."
+		c.Detail = "Установлен: " + app.name + v + ". Нужен для входа по ЭЦП (МНС, ЭСЧФ, ФСЗН, Минфин, Белгосстрах, ЕГР, маркировка). Обновления — на avest.by."
 	} else {
 		c.Status = "fail"
 		c.Detail = "Не обнаружен в реестре установленных программ. Без AVEST CSP вход по ЭЦП на большинство госпорталов невозможен — скачайте и установите."
+	}
+	return c
+}
+
+func checkNTClient() Check {
+	c := Check{
+		ID: "ntclient", Title: "NTClientSoftware (Е-ПАСЛУГА / ЕПЭУ)",
+		FixLabel: "Скачать с nces.by", FixURL: "https://nces.by/service/po/",
+	}
+	if app, ok := installedLike("ntclientsoftware"); ok {
+		c.Status = "ok"
+		v := ""
+		if app.version != "" {
+			v = ", версия " + app.version
+		}
+		c.Detail = "Установлен: " + app.name + v + ". Обеспечивает вход по ЭЦП/ID-карте на Единый портал электронных услуг и Е-ПАСЛУГА."
+	} else if app, ok := installedLike("nt client"); ok {
+		c.Status = "ok"
+		c.Detail = "Установлен: " + app.name + ". Обеспечивает вход по ЭЦП/ID-карте на ЕПЭУ и Е-ПАСЛУГА."
+	} else {
+		c.Status = "warn"
+		c.Detail = "Не найден. Нужен, если работаете на Едином портале электронных услуг (portal.gov.by) или Е-ПАСЛУГА по ЭЦП/ID-карте. Вместе с ним ставится G-SecTLS Client (ID-карты)."
 	}
 	return c
 }

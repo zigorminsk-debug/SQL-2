@@ -1,11 +1,2 @@
 # Auto detect text files and perform LF normalization
 * text=auto
-
-# Go-исходники и файлы приложения — строго LF (иначе gofmt в CI на Windows ругается на CRLF)
-*.go text eol=lf
-*.html text eol=lf
-*.json text eol=lf
-*.yml text eol=lf
-*.yaml text eol=lf
-*.md text eol=lf
-go.mod text eol=lf
