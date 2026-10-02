@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ГосПорталы РБ — панель доступа</title>
+<style>
+  :root{
+    --red:#c0392b; --red-d:#9e2b20; --green:#2e7d46; --green-l:#e6f4ea;
+    --bg:#f2f3f5; --card:#ffffff; --ink:#1c2430; --muted:#667085; --line:#e4e7ec;
+    --amber:#b54708; --amber-l:#fef0e6; --blue:#175cd3; --blue-l:#eff5ff;
+    --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.1);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.5 "Segoe UI",system-ui,-apple-system,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+  header{background:linear-gradient(135deg,#a52719 0%,var(--red) 45%,#7a1f15 100%);color:#fff;padding:0}
+  .hwrap{max-width:1200px;margin:0 auto;padding:14px 20px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  .logo{width:44px;height:44px;flex:0 0 44px;border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--red);font-size:17px;box-shadow:var(--shadow)}
+  h1{font-size:19px;margin:0;letter-spacing:.2px}
+  .sub{opacity:.85;font-size:12.5px;margin-top:2px}
+  .hright{margin-left:auto;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .search{position:relative}
+  .search input{width:300px;max-width:62vw;padding:9px 12px 9px 34px;border-radius:8px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.14);color:#fff;outline:none;font-size:13.5px}
+  .search input::placeholder{color:rgba(255,255,255,.75)}
+  .search input:focus{background:rgba(255,255,255,.22);border-color:#fff}
+  .search svg{position:absolute;left:10px;top:9px;opacity:.8}
+  .tabs{display:flex;background:rgba(0,0,0,.18);border-radius:9px;padding:3px;gap:2px}
+  .tabs button{border:0;background:transparent;color:rgba(255,255,255,.85);padding:7px 13px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap}
+  .tabs button.on{background:#fff;color:var(--red-d);box-shadow:var(--shadow)}
+  main{max-width:1200px;margin:0 auto;padding:18px 20px 60px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 16px}
+  .chip{border:1px solid var(--line);background:#fff;color:var(--ink);padding:6px 12px;border-radius:999px;cursor:pointer;font-size:12.5px;font-weight:600;box-shadow:var(--shadow)}
+  .chip.on{background:var(--red);border-color:var(--red);color:#fff}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:9px;position:relative}
+  .card .top{display:flex;gap:10px;align-items:flex-start}
+  .dot{width:9px;height:9px;border-radius:50%;flex:0 0 9px;margin-top:7px;background:#98a2b3}
+  .dot.up{background:#17a34a;box-shadow:0 0 0 3px rgba(23,163,74,.15)}
+  .dot.down{background:#d92d20;box-shadow:0 0 0 3px rgba(217,45,32,.12)}
+  .cname{font-weight:700;font-size:14.5px;line-height:1.35}
+  .cdesc{color:var(--muted);font-size:12.8px}
+  .badges{display:flex;gap:5px;flex-wrap:wrap}
+  .b{font-size:11px;font-weight:700;padding:2.5px 8px;border-radius:999px;border:1px solid transparent}
+  .b.ecp{background:#fff1f0;color:var(--red-d);border-color:#ffcdc7}
+  .b.mecp{background:#fdf2f8;color:#b0217f;border-color:#f5c7e4}
+  .b.msi{background:var(--blue-l);color:var(--blue);border-color:#cfe1ff}
+  .b.lp{background:#f2f4f7;color:#3f4a5f;border-color:#e4e7ec}
+  .b.esa{background:var(--green-l);color:var(--green);border-color:#bfe6cc}
+  .b.ref{background:#f4f3ff;color:#5925dc;border-color:#ddd6fe}
+  .b.ie{background:var(--amber-l);color:var(--amber);border-color:#ffd9b5}
+  .acts{display:flex;gap:8px;margin-top:auto;align-items:center;flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;gap:6px;text-decoration:none;border-radius:8px;padding:8px 13px;font-size:12.8px;font-weight:700;border:1px solid var(--line);color:var(--ink);background:#fff;cursor:pointer;box-shadow:var(--shadow)}
+  .btn:hover{border-color:#cbd2d9}
+  .btn.primary{background:var(--green);border-color:var(--green);color:#fff}
+  .btn.primary:hover{background:#256b3b}
+  .star{margin-left:auto;border:0;background:none;font-size:19px;cursor:pointer;color:#c1c7d0;line-height:1;padding:4px}
+  .star.on{color:#f2b705}
+  .note{border-top:1px dashed var(--line);padding-top:9px;font-size:12.3px;color:#4a5568;display:none}
+  .note.show{display:block}
+  .linklike{border:0;background:none;padding:0;color:var(--blue);cursor:pointer;font-size:12.3px;font-weight:600;text-align:left}
+  .statusline{font-size:11.5px;color:var(--muted)}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px;box-shadow:var(--shadow);margin-bottom:16px}
+  .panel h2{margin:0 0 4px;font-size:16px}
+  .panel .lead{color:var(--muted);font-size:13px;margin:0 0 12px}
+  .tools{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+  .tool{border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .tool h3{margin:0 0 4px;font-size:13.5px}
+  .tool p{margin:0 0 9px;font-size:12.3px;color:var(--muted)}
+  .tool a{color:var(--blue);font-weight:700;font-size:12.5px;text-decoration:none}
+  .tool a:hover{text-decoration:underline}
+  .diag-row{display:flex;gap:10px;align-items:flex-start;padding:10px 2px;border-top:1px solid var(--line);font-size:13px}
+  .diag-row .ic{width:22px;flex:0 0 22px;font-weight:800;text-align:center}
+  .ic.ok{color:var(--green)} .ic.warn{color:var(--amber)} .ic.fail{color:#d92d20} .ic.info{color:var(--blue)}
+  .diag-row .t{font-weight:700}
+  .diag-row .d{color:var(--muted);font-size:12.4px;margin-top:1px}
+  .diag-row a{color:var(--blue);text-decoration:none;font-weight:600}
+  .steps{counter-reset:s;margin:0;padding:0;list-style:none}
+  .steps li{counter-increment:s;padding:7px 0 7px 34px;position:relative;font-size:13px;border-top:1px dashed var(--line)}
+  .steps li:first-child{border-top:0}
+  .steps li::before{content:counter(s);position:absolute;left:0;top:8px;width:22px;height:22px;border-radius:50%;background:var(--red);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center}
+  .warn-box{background:var(--blue-l);border:1px solid #c8ddff;color:#123b7a;border-radius:10px;padding:11px 14px;font-size:12.6px}
+  .sec-hidden{display:none}
+  .footer{color:var(--muted);font-size:11.8px;margin-top:26px;text-align:center}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#1c2430;color:#fff;padding:10px 18px;border-radius:9px;font-size:13px;box-shadow:var(--shadow);opacity:0;transition:.25s;pointer-events:none;max-width:80vw}
+  .toast.show{opacity:1}
+  kbd{background:#eef0f3;border:1px solid #d5d9e0;border-bottom-width:2px;border-radius:5px;padding:0 5px;font-size:11px}
+  @media(max-width:680px){.search input{width:52vw}.hright{width:100%;margin-left:0}.tabs{order:3}}
+</style>
+</head>
+<body>
+<header>
+  <div class="hwrap">
+    <div class="logo">БЯ</div>
+    <div>
+      <h1>ГосПорталы РБ</h1>
+      <div class="sub">Все государственные порталы Беларуси + настройки для входа — в одном окне <span id="ver"></span></div>
+    </div>
+    <div class="hright">
+      <div class="search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="q" placeholder="Поиск: МНС, ФСЗН, ЭСЧФ… ( / )">
+      </div>
+      <nav class="tabs">
+        <button data-tab="portals" class="on">🗂 Порталы</button>
+        <button data-tab="setup">⚙ Настройки входа</button>
+        <button data-tab="help">❓ Помощь</button>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- ПОРТАЛЫ -->
+  <section id="sec-portals">
+    <div class="chips" id="chips"></div>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <!-- НАСТРОЙКИ ВХОДА -->
+  <section id="sec-setup" class="sec-hidden">
+    <div class="panel">
+      <h2>Диагностика рабочего места</h2>
+      <p class="lead">Проверка типовых «настроек для входа» на госпорталы: криптопровайдер, сертификаты, браузер. Никакие данные с компьютера никуда не отправляются — всё выполняется локально.</p>
+      <button class="btn primary" id="runDiag">▶ Запустить проверку системы</button>
+      <span class="statusline" id="diagStatus"></span>
+      <div id="diagOut"></div>
+    </div>
+    <div class="panel">
+      <h2>Что нужно для входа по ЭЦП</h2>
+      <p class="lead">Юрлица и ИП работают на госпорталах с электронной цифровой подписью. Минимальный набор:</p>
+      <div class="tools">
+        <div class="tool"><h3>1. Криптопровайдер AVEST CSP</h3><p>Национальное СКЗИ: без него не работают МНС, ФСЗН, Минфин, Белгосстрах, Белстат по ЭЦП. 30 дней — бесплатный ознакомительный период.</p><a href="https://avest.by" target="_blank" rel="noopener">avest.by → скачать</a></div>
+        <div class="tool"><h3>2. Сертификат ключа ЭЦП</h3><p>Выдаётся удостоверяющим центром (РУЦ ОСТ, НУЦ, ГосСУОК — для бюджетников). Ключевой носитель — токен/флешка AVEST.</p><a href="https://nca.by" target="_blank" rel="noopener">nca.by — Нац. удостоверяющий центр</a></div>
+        <div class="tool"><h3>3. Корневые сертификаты НУЦ / ГосСУОК</h3><p>Устанавливаются в «Доверенные корневые» Windows, иначе порталы выдают ошибку «сертификат не доверенный».</p><a href="https://nca.by" target="_blank" rel="noopener">nca.by</a> · <a href="https://gosuok.gov.by" target="_blank" rel="noopener">gosuok.gov.by</a></div>
+        <div class="tool"><h3>4. AvTuneProxy (вход «без ЭЦП»)</h3><p>Нужен только для Корпоративного портала ФСЗН при входе по логину МСИ вместо ЭЦП.</p><a href="https://avtunproxy.by/windows/" target="_blank" rel="noopener">avtunproxy.by → скачать для Windows</a></div>
+        <div class="tool"><h3>5. Браузер с режимом IE</h3><p>МНС (физическая ЭЦП) и «Электронный респондент» Белстата работают в Internet Explorer 11 или Edge в режиме IE. МЭЦП и логин/пароль — в любых браузерах.</p><a href="#" id="showIeSteps">инструкция по включению режима IE ↓</a></div>
+        <div class="tool"><h3>6. Токен с драйвером</h3><p>Для аппаратных носителей AVEST ключ виден в «Диспетчере сертификатов» (AvCertMgr) после установки AVEST CSP.</p><a href="https://avest.by" target="_blank" rel="noopener">документация Avest →</a></div>
+      </div>
+      <div id="ieSteps" class="sec-hidden" style="margin-top:12px">
+        <div class="panel" style="margin:0;background:#fafbfc">
+          <h2 style="font-size:14px">Включение режима IE в Microsoft Edge</h2>
+          <ol class="steps">
+            <li>Откройте Edge → «…» → <b>Параметры</b> → <b>Браузер по умолчанию</b>.</li>
+            <li>«Разрешить сайтам перезагрузку в режиме Internet Explorer» → <b>Разрешить</b>, перезапустите Edge.</li>
+            <li>«Страницы в режиме Internet Explorer» → <b>Добавить страницу</b> и введите адрес портала (например, <i>http://e-respondent.belstat.gov.by/belstat/</i> для Белстата).</li>
+            <li>Откройте портал из панели — страница загрузится в режиме IE (значок ℹ «Internet Explorer» рядом с адресом).</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Идентификация без ЭЦП (МСИ, ЕСА, логин/пароль)</h2>
+      <div class="tools">
+        <div class="tool"><h3>МСИ — Межбанковская система идентификации</h3><p>Подтверждение личности онлайн: доступ в ЛК МНС (физлица), ФСЗН «без ЭЦП», банки. Регистрация — на сайте ЕРИП, в банке или мобильном приложении.</p><a href="https://ioauth.raschet.by/client/" target="_blank" rel="noopener">регистрация/вход в МСИ →</a></div>
+        <div class="tool"><h3>ЕСА — Единая служба аутентификации</h3><p>Единая учётная запись для portal.gov.by, «Обращений» и других госуслуг. Регистрация — онлайн на портале услуг, в сервисном центре ОАИП или через МСИ.</p><a href="https://auth.gia.gov.by" target="_blank" rel="noopener">auth.gia.gov.by →</a></div>
+        <div class="tool"><h3>Логин/пароль ЛК МНС (физлица)</h3><p>Учётная запись выдаётся бесплатно в любой налоговой (по паспорту) либо удалённо — через МСИ или оператора МТС/А1/life.</p><a href="https://lkfl.portal.nalog.gov.by" target="_blank" rel="noopener">lkfl.portal.nalog.gov.by →</a></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ПОМОЩЬ -->
+  <section id="sec-help" class="sec-hidden">
+    <div class="panel">
+      <h2>Как работать с панелью</h2>
+      <ol class="steps">
+        <li>Найдите нужный портал поиском или по категориям. Зелёная точка — портал отвечает, серая — проверка... красная — недоступен (возможно, регламентные работы).</li>
+        <li>Нажмите <b>«Войти»</b> — откроется официальная страница входа в новой вкладке. Логин и пароль вводите только там.</li>
+        <li>Звёздочкой ★ добавляйте частые порталы в избранное (хранится локально в этом браузере).</li>
+        <li>Вкладка <b>«Настройки входа»</b> — проверка крипто-окружения и список необходимых программ/сертификатов.</li>
+        <li>Быстрый переход к поиску — клавиша <kbd>/</kbd>.</li>
+      </ol>
+    </div>
+    <div class="panel">
+      <h2>Безопасность</h2>
+      <div class="warn-box">
+        🛡 Приложение работает полностью локально, <b>не запрашивает и не хранит логины/пароли/ЭЦП</b>, ничего не отправляет в интернет (кроме проверки доступности самих порталов). Аутентификация выполняется только на официальных доменах <b>*.gov.by</b> и официальных сервисах. Всегда проверяйте адрес сайта и сертификат перед вводом данных.
+      </div>
+    </div>
+    <div class="panel">
+      <h2>О программе</h2>
+      <p class="lead">Настольная панель идейно похожая на BELPORTAL (belportal.by): одно окно вместо десятков ярлыков. Однофайловый .exe, установка не требуется, ничего лишнего. Список порталов и справочные подсказки собраны из официальных источников; перед отчётным периодом сверяйте адреса с сайтами ведомств.</p>
+      <p class="statusline" id="metaLine"></p>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const CATS = {
+  report:"🧾 Налоги и отчётность", citizen:"👤 Гражданам", ved:"🚛 ВЭД и таможня",
+  torg:"🏗 Закупки и торги", service:"🏛 Госуслуги и идентификация", ref:"📚 Справочные"
+};
+const AUTH = {
+  ecp:["ЭЦП","ecp"], mecp:["МЭЦП","mecp"], msi:["МСИ","msi"],
+  lp:["Логин/пароль","lp"], esa:["ЕСА","esa"], ref:["Справочно","ref"]
+};
+let portals = [], statuses = {}, activeCat = "all";
+let favs = new Set(JSON.parse(localStorage.getItem("gp_favs") || "[]"));
+
+const $ = s => document.querySelector(s);
+const toast = m => { const t=$("#toast"); t.textContent=m; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),2600); };
+
+function badgeClass(a){ return (AUTH[a]||["?","lp"])[1]; }
+function badgeText(a){ return (AUTH[a]||[a])[0]; }
+
+function renderChips(){
+  const el = $("#chips");
+  const cats = ["all","fav", ...new Set(portals.map(p=>p.cat))];
+  el.innerHTML = cats.map(c=>{
+    const label = c==="all" ? "Все" : c==="fav" ? "★ Избранное" : (CATS[c]||c);
+    return `<button class="chip ${c===activeCat?'on':''}" data-c="${c}">${label}</button>`;
+  }).join("");
+  el.querySelectorAll(".chip").forEach(b=>b.onclick=()=>{activeCat=b.dataset.c;renderChips();renderGrid();});
+}
+
+function renderGrid(){
+  const q = $("#q").value.trim().toLowerCase();
+  const grid = $("#grid");
+  const list = portals.filter(p=>{
+    if(activeCat==="fav" && !favs.has(p.id)) return false;
+    if(activeCat!=="all" && activeCat!=="fav" && p.cat!==activeCat) return false;
+    if(q && !(p.name+" "+p.desc+" "+(p.note||"")).toLowerCase().includes(q)) return false;
+    return true;
+  });
+  if(!list.length){ grid.innerHTML = `<div class="panel" style="grid-column:1/-1">Ничего не найдено. Уточните запрос или сбросьте фильтр.</div>`; return; }
+  grid.innerHTML = list.map(p=>{
+    const st = statuses[p.id];
+    const dot = st ? (st.ok ? "up":"down") : "";
+    const stText = st ? (st.ok ? `доступен · ${st.ms} мс` : "недоступен") : "проверка…";
+    const badges = (p.auth||[]).map(a=>`<span class="b ${badgeClass(a)}">${badgeText(a)}</span>`).join("")
+                 + (p.ie?`<span class="b ie">нужен IE-режим</span>`:"");
+    return `<article class="card">
+      <div class="top">
+        <span class="dot ${dot}" title="${stText}"></span>
+        <div>
+          <div class="cname">${esc(p.name)}</div>
+          <div class="cdesc">${esc(p.desc)}</div>
+        </div>
+      </div>
+      <div class="badges">${badges}</div>
+      ${p.note?`<button class="linklike" data-note="${p.id}">▸ что нужно для входа</button>
+      <div class="note" id="note-${p.id}">${esc(p.note)}</div>`:""}
+      <div class="acts">
+        <a class="btn primary" href="${p.login}" target="_blank" rel="noopener">Войти →</a>
+        ${p.site!==p.login?`<a class="btn" href="${p.site}" target="_blank" rel="noopener">Сайт</a>`:""}
+        <span class="statusline">${stText}</span>
+        <button class="star ${favs.has(p.id)?'on':''}" data-fav="${p.id}" title="в избранное">★</button>
+      </div>
+    </article>`;
+  }).join("");
+  grid.querySelectorAll("[data-note]").forEach(b=>b.onclick=()=>{
+    const n = document.getElementById("note-"+b.dataset.note);
+    n.classList.toggle("show");
+    b.textContent = (n.classList.contains("show")?"▾":"▸")+" что нужно для входа";
+  });
+  grid.querySelectorAll("[data-fav]").forEach(b=>b.onclick=()=>{
+    const id=b.dataset.fav;
+    favs.has(id)?favs.delete(id):favs.add(id);
+    localStorage.setItem("gp_favs", JSON.stringify([...favs]));
+    renderChips(); renderGrid();
+  });
+}
+
+function esc(s){ return (s||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+async function load(){
+  try{
+    portals = await (await fetch("/api/portals")).json();
+    renderChips(); renderGrid();
+    statuses = await (await fetch("/api/status")).json();
+    renderGrid();
+    const meta = await (await fetch("/api/meta")).json();
+    $("#ver").textContent = `· v${meta.version}`;
+    $("#metaLine").textContent = `${meta.name} v${meta.version} · сборка: ${meta.os}/${meta.arch}`;
+  }catch(e){ toast("Ошибка загрузки: "+e.message); }
+}
+
+$("#q").addEventListener("input", renderGrid);
+document.addEventListener("keydown", e=>{ if(e.key==="/" && document.activeElement!==$("#q")){e.preventDefault();$("#q").focus();} });
+
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("on",x===b));
+  ["portals","setup","help"].forEach(t=>$("#sec-"+t).classList.toggle("sec-hidden", t!==b.dataset.tab));
+});
+
+$("#showIeSteps").onclick = e=>{ e.preventDefault(); $("#ieSteps").classList.toggle("sec-hidden"); };
+
+$("#runDiag").onclick = async ()=>{
+  $("#diagStatus").textContent = " Проверяю систему…";
+  $("#diagOut").innerHTML = "";
+  try{
+    const rows = await (await fetch("/api/checks")).json();
+    const icons = {ok:"✓", warn:"!", fail:"✕", info:"ℹ"};
+    $("#diagOut").innerHTML = rows.map(c=>`
+      <div class="diag-row">
+        <div class="ic ${c.status}">${icons[c.status]||"ℹ"}</div>
+        <div>
+          <div class="t">${esc(c.title)}</div>
+          <div class="d">${esc(c.detail)}</div>
+          ${c.fixUrl && c.status!=="ok" ? `<a href="${c.fixUrl}" target="_blank" rel="noopener">${esc(c.fixLabel||"исправить")} →</a>`:""}
+        </div>
+      </div>`).join("");
+    $("#diagStatus").textContent = " Готово: проверок — "+rows.length;
+  }catch(e){ $("#diagStatus").textContent = " Ошибка: "+e.message; }
+};
+
+load();
+</script>
+</body>
+</html>
