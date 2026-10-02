@@ -1,0 +1,9 @@
+# Зависимости MS SQL Monitor
+# Драйверы подключения: достаточно любого, но ставим оба —
+# pyodbc использует системный "ODBC Driver 17/18 for SQL Server",
+# pymssql несёт встроенный FreeTDS (внешние драйверы не нужны).
+pyodbc>=5.0.0
+pymssql>=2.2.8
+
+# Для сборки EXE (не нужно при запуске из Python):
+#   pip install pyinstaller
