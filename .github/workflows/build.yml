@@ -38,7 +38,8 @@ jobs:
         shell: bash
         run: |
           go vet ./...
-          if [ -n "$(gofmt -l .)" ]; then echo "gofmt: есть неотформатированные файлы"; exit 1; fi
+          bad=$(gofmt -l . | grep -v '^vendor/')
+          if [ -n "$bad" ]; then echo "gofmt: есть неотформатированные файлы:"; echo "$bad"; exit 1; fi
 
       - name: Сборка GosPortalyRB.exe (Windows x64)
         shell: bash
