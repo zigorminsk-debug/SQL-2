@@ -1,0 +1,90 @@
+name: Сборка GosPortalyRB (Windows .exe)
+
+# Автосборка после каждого изменения приложения в gosportals/
+on:
+  push:
+    branches: [arena/01a0fd02-sql-2, main]
+    paths:
+      - "gosportals/**"
+      - ".github/workflows/build.yml"
+    tags: ["v*"]
+  workflow_dispatch: {} # ручной запуск из вкладки Actions
+
+permissions:
+  contents: write # нужно для публикации релизов по тегам v*
+
+concurrency:
+  group: gosportals-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Ветка/тег ${{ github.ref_name }} → .exe
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: gosportals
+    steps:
+      - name: Клонирование репозитория
+        uses: actions/checkout@v4
+
+      - name: Установка Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: gosportals/go.mod
+          cache: false # внешних зависимостей нет (чистый stdlib)
+
+      - name: Проверка кода (vet + форматирование)
+        shell: bash
+        run: |
+          go vet ./...
+          # vendor/ исключаем (на Windows gofmt печатает пути с \): чужой код не форматируем
+          # "|| true" обязателен: grep с пустым выводом отдаёт код 1, а bash -e тогда прерывает шаг
+          bad=$(gofmt -l . | grep -v '^vendor' || true)
+          if [ -n "$bad" ]; then echo "gofmt: есть неотформатированные файлы:"; echo "$bad"; exit 1; fi
+
+      - name: Сборка GosPortalyRB.exe (Windows x64)
+        shell: bash
+        run: |
+          mkdir -p release
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 \
+            go build -trimpath -ldflags="-s -w" -o release/GosPortalyRB.exe .
+          ls -la release/
+
+      - name: Сборка Linux-бинаря (для контроля)
+        shell: bash
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+            go build -trimpath -ldflags="-s -w" -o release/gosportals-linux .
+
+      - name: Контрольные суммы SHA-256
+        shell: bash
+        run: |
+          cd release && sha256sum GosPortalyRB.exe gosportals-linux | tee SHA256SUMS.txt
+
+      - name: Безопасное имя артефакта (без слэшей)
+        shell: bash
+        run: echo "SAFE_REF=${GITHUB_REF_NAME//\//-}" >> "$GITHUB_ENV"
+
+      - name: Публикация артефактов сборки
+        uses: actions/upload-artifact@v4
+        with:
+          name: GosPortalyRB-${{ env.SAFE_REF }}
+          path: |
+            gosportals/release/GosPortalyRB.exe
+            gosportals/release/gosportals-linux
+            gosportals/release/SHA256SUMS.txt
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Релиз на GitHub (при теге v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            release/GosPortalyRB.exe#gosportals-exe-windows-x64 \
+            release/SHA256SUMS.txt \
+            --title "ГосПорталы РБ ${{ github.ref_name }}" \
+            --generate-notes
