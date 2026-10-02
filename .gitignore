@@ -25,4 +25,4 @@ go.work.sum
 .env
 
 # Архивы локальных сборок (нумерованные лежат в GitHub Releases)
-release/*.zip
+**/release/*.zip
