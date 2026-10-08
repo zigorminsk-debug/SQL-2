@@ -27,6 +27,7 @@ import threading
 import time
 import webbrowser
 
+from console import configure_console
 import analysis
 from lifecycle import BackgroundTasks
 import checks
@@ -990,6 +991,7 @@ def run_demo_report(outpath):
 
 
 def main():
+    configure_console()
     p = argparse.ArgumentParser(
         prog="MSSQLMonitor",
         description="MS SQL Monitor — контроль, диагностика и оптимизация MS SQL Server")

@@ -133,10 +133,18 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Smoke test packaged CLI and generate demo report
         run: |
-          & ./dist/MSSQLMonitorCLI.exe --version
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          & ./dist/MSSQLMonitorCLI.exe --demo-report dist/demo_report.html
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          function Invoke-Checked([scriptblock]$Command) {
+            $output = @(& $Command 2>&1)
+            $code = $LASTEXITCODE
+            $output | ForEach-Object { Write-Host "$_" }
+            if ($code -ne 0) {
+              $message = ($output -join "`n").Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+              Write-Host "::error title=Packaged CLI exited with code ${code}::$message"
+              exit $code
+            }
+          }
+          Invoke-Checked { & ./dist/MSSQLMonitorCLI.exe --version }
+          Invoke-Checked { & ./dist/MSSQLMonitorCLI.exe --demo-report dist/demo_report.html }
           Copy-Item README.md dist/README.md
           "Commit: $env:GITHUB_SHA`nRun: $env:GITHUB_RUN_NUMBER`nCLI: MSSQLMonitorCLI.exe --cli --server YOUR-SERVER" | Set-Content dist/BUILD_INFO.txt
           Get-ChildItem dist/*.exe | ForEach-Object {
