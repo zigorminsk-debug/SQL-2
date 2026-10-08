@@ -6,13 +6,16 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 )
 
 func main() {
 	fs := flag.NewFlagSet("MSSQLMonitor", flag.ContinueOnError)
+	fWorkload := fs.String("workload", "unknown", "профиль: unknown | erp | accounting")
 	fCLI := fs.Bool("cli", false, "консольный режим (без GUI)")
 	fServer := fs.String("server", "", "сервер SQL Server (host или host\\instance)")
 	fPort := fs.Int("port", 1433, "порт TCP (по умолчанию 1433)")
@@ -41,6 +44,10 @@ func main() {
 		os.Exit(2)
 	}
 
+	if !validWorkload(*fWorkload) {
+		fmt.Fprintln(os.Stderr, "Неизвестный профиль нагрузки")
+		os.Exit(2)
+	}
 	if *fVersion {
 		fmt.Printf("MS SQL Monitor %s (Go), %s/%s\n", Version, runtime.GOOS, runtime.GOARCH)
 		return
@@ -49,7 +56,9 @@ func main() {
 	// ---- режим: демо-отчёт и выход ----
 	if *fDemoReport {
 		cfg := defaultConfig()
+		cfg.Workload = *fWorkload
 		lg := NewLogger()
+		defer lg.Close()
 		app := NewApp(&cfg, lg)
 		path, health, findings := app.buildDemoReport()
 		fmt.Printf("Демо-отчёт: %s\nПроблем: %d (критично: %d, важно: %d, "+
@@ -68,8 +77,14 @@ func main() {
 	}
 
 	// ---- GUI (веб) ----
-	cfg := defaultConfig()
+	cfg := LoadConfig()
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "workload" {
+			cfg.Workload = *fWorkload
+		}
+	})
 	lg := NewLogger()
+	defer lg.Close()
 	app := NewApp(&cfg, lg)
 	if *fDemo {
 		app.Connect(NewDemoDatabase())
@@ -95,6 +110,16 @@ func main() {
 	if !*fNoBrowser {
 		openBrowser(url)
 	}
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(signals)
+	go func() {
+		select {
+		case <-signals:
+			app.Shutdown()
+		case <-app.exitCh:
+		}
+	}()
 	app.Wait()
 }
 
@@ -128,7 +153,9 @@ func runCLI(fs *flag.FlagSet, fServer *string, fPort *int, fDatabase *string,
 	fInterval *int, fLongQuery *float64, fDuration *float64, fHours *float64,
 	fSkipMonitor *bool, fNoFrag *bool, fNoErrorLog *bool, fNoPlanXML *bool) {
 	lg := NewLogger()
+	defer lg.Close()
 	cfg := defaultConfig()
+	cfg.Workload = fs.Lookup("workload").Value.String()
 	if *fHours != 24 && *fDuration == 24 {
 		cfg.DurationHours = int(*fHours)
 	} else if *fDuration != 24 {
@@ -212,7 +239,7 @@ func runCLI(fs *flag.FlagSet, fServer *string, fPort *int, fDatabase *string,
 	}
 
 	fmt.Println("Глубокая диагностика и построение отчёта…")
-	opts := CheckOptions{Fragmentation: !*fNoFrag, ErrorLog: !*fNoErrorLog,
+	opts := CheckOptions{Workload: cfg.Workload, Fragmentation: !*fNoFrag, ErrorLog: !*fNoErrorLog,
 		PlanXML: !*fNoPlanXML}
 	t0 := time.Now()
 	samples, _ := store.LoadSamples(0, 0)

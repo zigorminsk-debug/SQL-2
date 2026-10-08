@@ -425,7 +425,7 @@ class Report(object):
  <span class='lg'><span class='sw' style='background:#e8710a'></span>система в целом, %%</span></div></div>
 <div class='chart-block'><h3>Скорость обработки — запросов в секунду (Batch Requests/sec)</h3>%(batch)s</div>
 <div class='chart-block'><h3>Время жизни страниц в памяти (Page Life Expectory)</h3>%(ple)s
- <p class='muted'>Значения ниже 300 с — признак нехватки памяти буферного пула.</p></div>
+ <p class='muted'>300 с — эвристика, не норматив; сравните с эталоном системы и физическими чтениями.</p></div>
 <div class='chart-block'><h3>Память SQL Server</h3>%(mem)s</div>
 <div class='chart-block'><h3>Задержки ввода-вывода (мс на операцию)</h3>%(io)s
  <p class='muted'>Норма: до 10–20 мс на чтение и запись. Выше 30 мс — диск не справляется.</p></div>
@@ -952,9 +952,9 @@ class Report(object):
     def _config(self):
         cfg = {r.get("name"): r for r in (self.d.get("configs") or [])}
         recs = {
-            "max server memory (MB)": ("~70–80% ОЗУ (см. раздел «Память» в рекомендациях)",),
-            "max degree of parallelism": ("8 или число ядер NUMA-узла (для OLTP)",),
-            "cost threshold for parallelism": ("25–50",),
+            "max server memory (MB)": ("Лимит с резервом ОС/служб по измерениям",),
+            "max degree of parallelism": ("По профилю нагрузки, online CPU и NUMA",),
+            "cost threshold for parallelism": ("По планам и дельтам waits, не универсальное значение",),
             "optimize for ad hoc workloads": ("1 (включить)",),
             "max worker threads": ("0 (авто) — менять только при THREADPOOL-проблемах",),
             "clr enabled": ("0 (без необходимости не включать)",),

@@ -28,6 +28,7 @@ import time
 import webbrowser
 
 import analysis
+from lifecycle import BackgroundTasks
 import checks
 import demo
 import report
@@ -177,6 +178,8 @@ def generate_report(db, storage=None, period_hours=None, options=None,
     data = checks.collect_deep(db, options=options, progress=prog,
                                blocking_events=blocking_events,
                                long_queries=long_queries)
+    if hasattr(db, "check_cancelled"):
+        db.check_cancelled()
     if log_cb:
         if data.get("errors"):
             log_cb("Недоступные проверки: %s" % ", ".join(data["errors"].keys()))
@@ -237,6 +240,7 @@ def run_gui():
             self.minsize(960, 640)
             self.cfg = cfg
             self.db = None
+            self.tasks = BackgroundTasks()
             self.monitor = None
             self.storage = Storage(DB_PATH)
             self.storage.purge(14)
@@ -249,7 +253,7 @@ def run_gui():
             except Exception:
                 pass
             self._build_ui()
-            self.after(200, self._poll)
+            self._poll_id = self.after(200, self._poll)
 
         # ------------------------------------------------- UI
         def _build_ui(self):
@@ -282,6 +286,7 @@ def run_gui():
             bar.pack(fill="x", side="bottom")
             self.bar_lbl = ttk.Label(bar, text="Готово")
             self.bar_lbl.pack(side="left")
+            ttk.Button(bar, text="Выход", command=self.on_close).pack(side="right")
             ttk.Label(bar, text="v%s" % VERSION, foreground="#90a4ae").pack(side="right")
 
         def _lab(self, parent, text, w=16):
@@ -530,19 +535,19 @@ def run_gui():
         # ------------------------------------------------- подключения
         def _make_db(self):
             if self.v_demo.get():
-                return demo.DemoDatabase()
+                return self.tasks.register(demo.DemoDatabase())
             port = int(self.v_port.get() or 1433)
             pref = "auto"
             if self.v_driver.get().startswith("pyodbc"):
                 pref = "pyodbc"
             elif self.v_driver.get().startswith("pymssql"):
                 pref = "pymssql"
-            return Database(
+            return self.tasks.register(Database(
                 server=self.v_server.get().strip(), database=self.v_db.get().strip() or "master",
                 windows_auth=self.v_win.get(), user=self.v_user.get().strip(),
                 password=self.v_pwd.get(), port=port,
                 encrypt=self.v_encrypt.get(), trust_cert=self.v_trust.get(),
-                preferred=pref)
+                preferred=pref))
 
         def test_connection(self):
             self.btn_test.state(["disabled"])
@@ -551,10 +556,9 @@ def run_gui():
             def work():
                 try:
                     db = self._make_db()
-                    t = db.test()
                     if not isinstance(db, demo.DemoDatabase):
                         db.connect()
-                        t = db.test()
+                    t = db.test()
                     self.db = db
                     ver = (t.get("v") or "").split("\n")[0]
                     self.q.put(("log", "Подключение успешно: %s" % ver, "ok"))
@@ -564,7 +568,7 @@ def run_gui():
                     self.q.put(("log", "Ошибка подключения: %s" % e, "err"))
                     self.q.put(("conn_fail", str(e), None))
 
-            threading.Thread(target=work, daemon=True).start()
+            self.tasks.start(work)
 
         def save_settings(self):
             c = self.cfg
@@ -678,6 +682,8 @@ def run_gui():
                         duration_s=hours * 3600,
                         long_query_s=self.cfg.get("long_query_s", 30),
                         on_sample=on_sample, on_log=on_log, on_done=on_done)
+                    if self.tasks.stopping.is_set():
+                        return
                     self.monitor = eng
                     self.q.put(("log", "Запуск мониторинга на %d ч (интервал %d c)…" %
                                 (hours, interval), "ok"))
@@ -685,7 +691,7 @@ def run_gui():
                 except Exception as e:
                     self.q.put(("log", "Не удалось запустить мониторинг: %s" % e, "err"))
 
-            threading.Thread(target=work, daemon=True).start()
+            self.tasks.start(work)
             self.btn_start.state(["disabled"])
             self.btn_stop.state(["!disabled"])
 
@@ -708,7 +714,7 @@ def run_gui():
                                 % engine.state.get("samples", 0))
             self.log("Мониторинг завершён: %d тиков, ошибок: %d"
                      % (engine.state.get("samples", 0), engine.state.get("errors", 0)), "ok")
-            if self.v_auto.get():
+            if not self.tasks.stopping.is_set() and not engine._stop_event.is_set() and self.v_auto.get():
                 self.log("Автоматическая генерация отчёта…")
                 self.make_report()
 
@@ -740,6 +746,8 @@ def run_gui():
                     html_text = generate_report(
                         db, storage=self.storage, period_hours=hours,
                         options=opts, log_cb=log_cb, sample_interval=interval)
+                    if self.tasks.stopping.is_set():
+                        return
                     path = save_report(html_text)
                     self.q.put(("report_done", path, None))
                 except Exception as e:
@@ -747,7 +755,7 @@ def run_gui():
                     self.q.put(("log", "Ошибка формирования отчёта: %s" % e, "err"))
                     self.q.put(("report_fail", str(e), None))
 
-            threading.Thread(target=work, daemon=True).start()
+            self.tasks.start(work)
 
         def make_demo_report(self):
             self.btn_report_busy(True)
@@ -772,6 +780,8 @@ def run_gui():
                             "interval": 60, "driver": "демо-режим"}
                     html_text = report.build_report(data, findings, health, peaks,
                                                     samples, blocking, longq, meta)
+                    if self.tasks.stopping.is_set():
+                        return
                     path = save_report(html_text)
                     self.q.put(("report_done", path, None))
                 except Exception as e:
@@ -779,7 +789,7 @@ def run_gui():
                     self.q.put(("log", "Ошибка демо-отчёта: %s" % e, "err"))
                     self.q.put(("report_fail", str(e), None))
 
-            threading.Thread(target=work, daemon=True).start()
+            self.tasks.start(work)
 
         def btn_report_busy(self, busy):
             pass
@@ -827,6 +837,8 @@ def run_gui():
         # ------------------------------------------------- очередь conn_ok/fail
         # (обрабатывается в _poll через универсальный диспатчер)
         def _poll(self):
+            if self.tasks.stopping.is_set():
+                return
             try:
                 while True:
                     item = self.q.get_nowait()
@@ -860,21 +872,36 @@ def run_gui():
                         self.btn_report_busy(False)
             except queue.Empty:
                 pass
-            self.after(250, self._poll)
+            self._poll_id = self.after(250, self._poll)
 
         def on_close(self):
-            if self.monitor and self.monitor.is_alive():
-                import tkinter.messagebox as mb
-                if not mb.askyesno(
-                        "MS SQL Monitor",
-                        "Идёт мониторинг. Остановить и выйти?\n(Собранные данные "
-                        "сохранены и будут использованы в следующем отчёте)"):
-                    return
+            if self.tasks.stopping.is_set():
+                return
+            import tkinter.messagebox as mb
+            if not mb.askyesno("MS SQL Monitor", "Остановить все задачи мониторинга и диагностики и выйти?\nСобранные данные сохранятся."):
+                return
+            self.tasks.stop()
+            self.after_cancel(self._poll_id)
+            if self.monitor:
                 self.monitor.stop()
-            try:
-                self.storage.close()
-            except Exception:
-                pass
+            def disable(widget):
+                for child in widget.winfo_children():
+                    if isinstance(child, (ttk.Button, ttk.Entry, ttk.Checkbutton, ttk.Combobox)):
+                        child.state(["disabled"])
+                    disable(child)
+            disable(self)
+            self.bar_lbl.config(text="Завершение фоновых задач… ожидание отмены/таймаута SQL-запроса")
+            self.after(100, self._wait_for_shutdown)
+
+        def _wait_for_shutdown(self):
+            # A startup worker can have created a monitor while Exit was pressed.
+            if self.monitor:
+                self.monitor.stop()
+            if self.tasks.alive() or (self.monitor and self.monitor.is_alive()):
+                self.after(100, self._wait_for_shutdown)
+                return
+            self.tasks.close_connections()
+            self.storage.close()
             self.destroy()
 
     app = App()

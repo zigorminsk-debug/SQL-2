@@ -12,7 +12,8 @@ import (
 
 // benign-ожидания (не характеризуют проблемы)
 var benignWaits = map[string]bool{
-	"WAITFOR": true, "SLEEP_TASK": true, "SLEEP_BPOOL_FLUSH": true,
+	"CXCONSUMER": true,
+	"WAITFOR":    true, "SLEEP_TASK": true, "SLEEP_BPOOL_FLUSH": true,
 	"SLEEP_DBSTARTUP": true, "SLEEP_DCOMSTARTUP": true, "SLEEP_MASTERDBREADY": true,
 	"SLEEP_MASTERMDREADY": true, "SLEEP_MASTERUPGRADED": true, "SLEEP_MSDBSTARTUP": true,
 	"SLEEP_SYSTEMTASK": true, "SLEEP_TEMPDBSTARTUP": true, "BROKER_TASK_STOP": true,
@@ -240,7 +241,7 @@ func collectLightSample(db Querier, prev *TickState, longQueryS float64) (
 		}
 		state.Waits = curW
 		if prev != nil && prev.Waits != nil && dt > 0 {
-			var deltas []WaitDelta
+			deltas := make([]WaitDelta, 0)
 			for wt, v := range curW {
 				if benignWaits[wt] {
 					continue
@@ -259,9 +260,6 @@ func collectLightSample(db Querier, prev *TickState, longQueryS float64) (
 					SignalMS: math.Round(math.Max(0, v[2]-p[2])/1000*1000) / 1000})
 			}
 			sort.Slice(deltas, func(i, j int) bool { return deltas[i].WaitMS > deltas[j].WaitMS })
-			if len(deltas) > 15 {
-				deltas = deltas[:15]
-			}
 			s.Waits = deltas
 		}
 	}

@@ -28,14 +28,14 @@ class MonitorEngine(threading.Thread):
         self.on_sample = on_sample
         self.on_log = on_log
         self.on_done = on_done
-        self._stop = threading.Event()
+        self._stop_event = threading.Event()
         self.state = {"samples": 0, "started": time.time(), "errors": 0}
         self._prev = None
         self._last_long = {}   # session_id -> (elapsed, ts)
 
     # --------------------------------------------------------------
     def stop(self):
-        self._stop.set()
+        self._stop_event.set()
 
     def _log(self, msg):
         log.info(msg)
@@ -44,6 +44,8 @@ class MonitorEngine(threading.Thread):
 
     def _tick(self):
         sample, state = checks.collect_light_sample(self.db, self._prev)
+        if self._stop_event.is_set():
+            return
         self._prev = state
         if sample.get("dt") is None and self.state["samples"] == 0:
             sample["dt"] = None
@@ -84,7 +86,7 @@ class MonitorEngine(threading.Thread):
             pass
         end_time = time.time() + self.duration_s
         try:
-            while not self._stop.is_set():
+            while not self._stop_event.is_set():
                 try:
                     self._tick()
                 except Exception as e:
@@ -93,16 +95,13 @@ class MonitorEngine(threading.Thread):
                     log.exception("tick failed")
                 if time.time() >= end_time:
                     break
-                # спим маленькими порциями, чтобы быстро останавливаться
-                wake = min(time.time() + self.interval, end_time)
-                while not self._stop.is_set() and time.time() < wake:
-                    time.sleep(min(2.0, max(0.2, wake - time.time())))
+                self._stop_event.wait(max(0, min(self.interval, end_time - time.time())))
         finally:
             try:
                 self.storage.finish_run()
             except Exception:
                 pass
-            reason = "остановлен пользователем" if self._stop.is_set() else "время истекло"
+            reason = "остановлен пользователем" if self._stop_event.is_set() else "время истекло"
             self._log("Мониторинг завершён (%s). Собрано тиков: %d"
                       % (reason, self.state["samples"]))
             if self.on_done:

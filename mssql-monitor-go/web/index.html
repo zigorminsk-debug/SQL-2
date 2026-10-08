@@ -216,6 +216,9 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin:22px 0}
       </div>
       <label class="chk"><input type="checkbox" id="s-auto" checked>
         Автоотчёт по завершении мониторинга</label>
+      <label for="s-workload">Профиль нагрузки для рекомендаций по статьям</label>
+      <select id="s-workload"><option value="unknown">Не задан / уточнить применимость 1С</option><option value="erp">1С: тяжёлая ERP</option><option value="accounting">1С: множество бухгалтерских баз</option></select>
+      <p class="muted small">Профиль не определяется автоматически по числу баз. Отчёт различает отклонения, отсутствие данных и ручные проверки.</p>
       <h3>Проверки глубокой диагностики</h3>
       <label class="chk"><input type="checkbox" id="s-frag" checked>
         Фрагментация индексов (может быть длительно на больших базах)</label>
@@ -250,22 +253,30 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin:22px 0}
       </ul>
       <p class="muted small">Реализация на Go, один исполняемый файл, без установки.
       Веб-интерфейс работает на локальном адресе этого компьютера.</p>
-      <button class="primary danger" id="b-exit">Завершить программу</button>
+      <p class="muted">Закрытие вкладки не останавливает программу. Используйте «Выход» внизу окна.</p>
     </div>
   </div>
 </main>
-<footer>MS SQL Monitor (Go) · данные: DMV Microsoft SQL Server</footer>
+<footer>MS SQL Monitor (Go) · данные: DMV Microsoft SQL Server <button class="primary danger" id="b-exit">Выход</button><span id="exit-status" role="status"></span></footer>
 
 <script>
+let exiting = false, settingsLoaded = false;
+const pendingRequests = new Set();
 let lastLogSeq = 0, stateTimer = null, logTimer = null;
 
 function $(id){ return document.getElementById(id); }
 function api(path, body, cb){
+  if(exiting && path !== '/api/exit') return;
+  const controller = new AbortController();
+  pendingRequests.add(controller);
   const opt = body ? {method:'POST', headers:{'Content-Type':'application/json'},
                       body: JSON.stringify(body)} : {};
-  fetch(path, opt).then(r => r.json()).then(j => { if(cb) cb(j); }).catch(e => {
-    if(cb) cb({ok:false, error:String(e)});
-  });
+  opt.signal = controller.signal;
+  fetch(path, opt).then(r => r.json()).then(j => {
+    if(cb && (!exiting || path === '/api/exit')) cb(j);
+  }).catch(e => {
+    if(e.name !== 'AbortError' && cb && (!exiting || path === '/api/exit')) cb({ok:false, error:String(e)});
+  }).finally(() => pendingRequests.delete(controller));
 }
 
 // вкладки
@@ -342,7 +353,9 @@ function refreshState(){
       $('m-warn').textContent = 'Подключитесь к серверу во вкладке «Подключение».';
     }
     // настройки
-    if(st.config){
+    if(st.config && !settingsLoaded){
+      settingsLoaded = true;
+      $('s-workload').value = st.config.workload || 'unknown';
       $('s-interval').value = st.config.interval || 60;
       $('s-duration').value = st.config.duration_hours || 24;
       $('s-longq').value = st.config.long_query_s || 30;
@@ -422,6 +435,7 @@ function loadReportsList(){
 
 // ---------- настройки ----------
 $('b-save').onclick = () => api('/api/settings', {
+  workload: $('s-workload').value,
   interval_sec: parseInt($('s-interval').value) || 60,
   duration_h: parseFloat($('s-duration').value) || 24,
   long_query_sec: parseFloat($('s-longq').value) || 30,
@@ -452,15 +466,23 @@ function loadLog(){
 
 // ---------- выход ----------
 $('b-exit').onclick = () => {
-  if(confirm('Завершить программу MS SQL Monitor?')){
-    api('/api/exit', {}, () => {
-      document.body.innerHTML = '<div style="padding:40px;text-align:center">' +
-        '<h2>Программа завершена</h2>' +
-        '<p class="muted">Это окно можно закрыть.</p></div>';
-      ['stateTimer','logTimer'].forEach(()=>{});
-      clearInterval(stateTimer); clearInterval(logTimer);
-    });
-  }
+  if(exiting || !confirm('Остановить мониторинг и диагностику, закрыть соединения и выйти? Собранные данные сохранятся.')) return;
+  exiting = true;
+  clearInterval(stateTimer); clearInterval(logTimer); clearInterval(reportPoll);
+  pendingRequests.forEach(c => c.abort());
+  document.querySelectorAll('button,input,select').forEach(e => e.disabled = true);
+  $('exit-status').textContent = ' Останавливаем фоновые задачи…';
+  api('/api/exit', {}, j => {
+    if(j.ok !== true){
+      $('exit-status').textContent = ' Завершение не подтверждено: ' + (j.error || 'ошибка') + '. Можно повторить выход.';
+      exiting = false;
+      $('b-exit').disabled = false;
+      return;
+    }
+    document.body.innerHTML = '<div style="padding:40px;text-align:center">' +
+      '<h2>Мониторинг и диагностика завершены</h2>' +
+      '<p>Соединения закрыты. Собранные данные сохранены. Это окно можно закрыть.</p></div>';
+  });
 };
 
 // ---------- запуск ----------

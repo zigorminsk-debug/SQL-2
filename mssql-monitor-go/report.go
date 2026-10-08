@@ -83,7 +83,7 @@ var navItems = [][2]string{
 	{"waits", "Ожидания"}, {"queries", "Запросы"}, {"sessions", "Сессии"},
 	{"deadlocks", "Блокировки"}, {"indexes", "Индексы"}, {"databases", "Базы"},
 	{"disks", "Диски"}, {"tempdb", "tempdb"}, {"config", "Настройки"},
-	{"ops", "Бэкапы"}, {"recs", "Рекомендации"},
+	{"audit", "Аудит по статьям"}, {"ops", "Бэкапы"}, {"recs", "Рекомендации"},
 }
 
 func (r *Report) header() string {
@@ -264,7 +264,7 @@ func (r *Report) timeline() string {
  <span class='lg'><span class='sw' style='background:#e8710a'></span>система в целом, %%</span></div></div>
 <div class='chart-block'><h3>Скорость обработки — запросов в секунду (Batch Requests/sec)</h3>%s</div>
 <div class='chart-block'><h3>Время жизни страниц в памяти (Page Life Expectancy)</h3>%s
- <p class='muted'>Значения ниже 300 с — признак нехватки памяти буферного пула.</p></div>
+ <p class='muted'>300 с — эвристика, не норматив. Сравните PLE с эталоном системы, lazy writes и физическими чтениями.</p></div>
 <div class='chart-block'><h3>Память SQL Server</h3>%s</div>
 <div class='chart-block'><h3>Задержки ввода-вывода (мс на операцию)</h3>%s
  <p class='muted'>Норма: до 10–20 мс на чтение и запись. Выше 30 мс — диск не справляется.</p></div>
@@ -1045,9 +1045,9 @@ func (r *Report) tempdbSection() string {
 // ---------- настройки ----------
 
 var configRecs = [][2]string{
-	{"max server memory (MB)", "~70–80% ОЗУ (см. раздел «Память» в рекомендациях)"},
-	{"max degree of parallelism", "8 или число ядер NUMA-узла (для OLTP)"},
-	{"cost threshold for parallelism", "25–50"},
+	{"max server memory (MB)", "Лимит с резервом ОС, служб и других инстансов; по измерениям"},
+	{"max degree of parallelism", "По профилю нагрузки, online CPU и NUMA; универсального значения нет"},
+	{"cost threshold for parallelism", "По планам и дельтам waits; 5 — повод проверить, не диагноз"},
 	{"optimize for ad hoc workloads", "1 (включить)"},
 	{"max worker threads", "0 (авто) — менять только при THREADPOOL-проблемах"},
 	{"clr enabled", "0 (без необходимости не включать)"},
@@ -1065,7 +1065,7 @@ func (r *Report) config() string {
 	}
 	var rows []string
 	for _, cr := range configRecs {
-		m := cfg[cr[0]]
+		m := cfg[strings.ToLower(cr[0])]
 		if m == nil {
 			continue
 		}
@@ -1352,7 +1352,7 @@ func (r *Report) body() string {
 	return "<body>\n" + r.header() + "\n<main>\n" +
 		r.summary() + r.timeline() + r.peaksSection() + r.waits() + r.queries() +
 		r.sessions() + r.longQueries() + r.deadlocks() + r.indexes() +
-		r.databases() + r.disks() + r.tempdbSection() + r.config() + r.ops() +
+		r.databases() + r.disks() + r.tempdbSection() + r.config() + r.audit() + r.ops() +
 		r.errorLog() + r.recs() + r.footer() +
 		"\n</main>\n<script>\n" + reportJS + "\n</script>\n</body></html>"
 }

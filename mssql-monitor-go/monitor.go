@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -15,6 +16,8 @@ type MonitorEngine struct {
 	duration   time.Duration
 	longQueryS float64
 
+	ctx     context.Context
+	cancel  context.CancelFunc
 	stopCh  chan struct{}
 	doneCh  chan struct{}
 	stopped bool
@@ -33,7 +36,8 @@ func NewMonitorEngine(db Querier, store *Store, interval, duration time.Duration
 	if interval < 5*time.Second {
 		interval = 5 * time.Second
 	}
-	return &MonitorEngine{db: db, store: store, interval: interval,
+	ctx, cancel := context.WithCancel(context.Background())
+	return &MonitorEngine{db: scopedQuerier{db, ctx}, ctx: ctx, cancel: cancel, store: store, interval: interval,
 		duration: duration, longQueryS: longQueryS,
 		stopCh: make(chan struct{}), doneCh: make(chan struct{}),
 		Started: time.Now()}
@@ -54,7 +58,15 @@ func (e *MonitorEngine) Start() {
 		var prev *TickState
 		lastLong := map[int]float64{} // session_id -> последний зафиксированный elapsed
 		for {
+			if e.ctx.Err() != nil {
+				e.finish(true)
+				return
+			}
 			sm, blocked, longs, state, err := collectLightSample(e.db, prev, e.longQueryS)
+			if e.ctx.Err() != nil {
+				e.finish(true)
+				return
+			}
 			if err != nil {
 				e.mu.Lock()
 				e.Errors++
@@ -90,14 +102,13 @@ func (e *MonitorEngine) Start() {
 			if wake.After(end) {
 				wake = end
 			}
-			for time.Now().Before(wake) {
-				select {
-				case <-e.stopCh:
-					e.finish(true)
-					return
-				default:
-					time.Sleep(200 * time.Millisecond)
-				}
+			timer := time.NewTimer(time.Until(wake))
+			select {
+			case <-e.stopCh:
+				timer.Stop()
+				e.finish(true)
+				return
+			case <-timer.C:
 			}
 			if !time.Now().Before(end) {
 				break
@@ -126,6 +137,7 @@ func (e *MonitorEngine) Stop() {
 	defer e.mu.Unlock()
 	if !e.stopped {
 		e.stopped = true
+		e.cancel()
 		close(e.stopCh)
 	}
 }
@@ -139,3 +151,6 @@ func (e *MonitorEngine) Alive() bool {
 		return true
 	}
 }
+
+func (e *MonitorEngine) Wait()         { <-e.doneCh }
+func (e *MonitorEngine) Stopped() bool { e.mu.Lock(); defer e.mu.Unlock(); return e.stopped }

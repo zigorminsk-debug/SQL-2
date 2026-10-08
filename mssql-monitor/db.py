@@ -8,6 +8,8 @@ db.py — слой доступа к MS SQL Server.
 Инструмент выполняет только SELECT по системным представлениям (только чтение).
 """
 
+import threading
+
 ODBC_DRIVERS = [
     "ODBC Driver 18 for SQL Server",
     "ODBC Driver 17 for SQL Server",
@@ -74,6 +76,10 @@ class Database(object):
         self.preferred = preferred
         self.driver_name = None
         self._conn = None
+        self._cancelled = threading.Event()
+        self._query_lock = threading.Lock()
+        self._cursor_lock = threading.Lock()
+        self._active_cursor = None
 
     # ---------------- подключение ----------------
     def connect(self):
@@ -86,11 +92,15 @@ class Database(object):
         else:
             order = ["pyodbc", "pymssql"]
         for drv in order:
+            self.check_cancelled()
             try:
                 if drv == "pyodbc":
                     self._connect_pyodbc()
                 else:
                     self._connect_pymssql()
+                if self._cancelled.is_set():
+                    self.close()
+                    self.check_cancelled()
                 return self
             except DBError as e:
                 errs.append(str(e))
@@ -123,6 +133,7 @@ class Database(object):
             raise DBError("pyodbc: не найден ODBC-драйвер SQL Server в системе")
         last_err = None
         for drv in avail:
+            self.check_cancelled()
             cs = ["DRIVER={%s}" % drv, "SERVER=%s" % self._srv(),
                   "DATABASE=%s" % self.database]
             if self.windows_auth:
@@ -172,17 +183,39 @@ class Database(object):
             self._conn = None
 
     # ---------------- запросы ----------------
+    def check_cancelled(self):
+        if self._cancelled.is_set():
+            raise DBError("Диагностика отменена: программа завершается")
+
+    def cancel(self):
+        self._cancelled.set()
+        with self._cursor_lock:
+            cur = self._active_cursor
+            # pyodbc supports cursor.cancel; pymssql is bounded by query_timeout.
+            if cur is not None and hasattr(cur, "cancel"):
+                cur.cancel()
+
     def _cursor(self):
+        self.check_cancelled()
         if self._conn is None:
             raise DBError("Нет активного подключения")
         return self._conn.cursor()
 
     def query(self, sql):
-        cur = self._cursor()
-        cur.execute(sql)
-        if cur.description is None:
-            return []
-        return rows_to_dicts(cur)
+        with self._query_lock:
+            with self._cursor_lock:
+                cur = self._cursor()
+                self._active_cursor = cur
+            try:
+                self.check_cancelled()
+                cur.execute(sql)
+                if cur.description is None:
+                    return []
+                return rows_to_dicts(cur)
+            finally:
+                with self._cursor_lock:
+                    self._active_cursor = None
+                    cur.close()
 
     def query_any(self, sqls):
         """Пробует несколько вариантов SQL (совместимость версий)."""
@@ -200,21 +233,31 @@ class Database(object):
 
     def query_iter(self, sql, cap=50000, batch=2000):
         """Итерация больших результатов (журнал ошибок) с ограничением."""
-        cur = self._cursor()
-        cur.execute(sql)
-        if cur.description is None:
-            return
-        names = [d[0] for d in cur.description]
-        n = 0
-        while n < cap:
-            rows = cur.fetchmany(batch)
-            if not rows:
-                break
-            for row in rows:
-                yield dict(zip(names, [_norm(v) for v in row]))
-                n += 1
-                if n >= cap:
-                    break
+        with self._query_lock:
+            with self._cursor_lock:
+                cur = self._cursor()
+                self._active_cursor = cur
+            try:
+                self.check_cancelled()
+                cur.execute(sql)
+                if cur.description is None:
+                    return
+                names = [d[0] for d in cur.description]
+                n = 0
+                while n < cap:
+                    self.check_cancelled()
+                    rows = cur.fetchmany(batch)
+                    if not rows:
+                        break
+                    for row in rows:
+                        yield dict(zip(names, [_norm(v) for v in row]))
+                        n += 1
+                        if n >= cap:
+                            break
+            finally:
+                with self._cursor_lock:
+                    self._active_cursor = None
+                    cur.close()
 
     def server_now(self):
         row = self.query_one("SELECT GETDATE() AS now")

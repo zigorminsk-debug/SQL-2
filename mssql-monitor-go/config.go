@@ -13,6 +13,7 @@ const Version = "2.0.0"
 const AppTitle = "MS SQL Monitor — контроль и оптимизация SQL Server"
 
 type Config struct {
+	Workload      string  `json:"workload"`
 	Server        string  `json:"server"`
 	Port          int     `json:"port"`
 	Database      string  `json:"database"`
@@ -34,7 +35,7 @@ type Config struct {
 
 func defaultConfig() Config {
 	return Config{
-		Server: "localhost", Port: 1433, Database: "master",
+		Workload: "unknown", Server: "localhost", Port: 1433, Database: "master",
 		WindowsAuth: true, User: "", PasswordB64: "",
 		SavePassword: false, Encrypt: false, TrustCert: true,
 		Interval: 60, DurationHours: 24, AutoReport: true,

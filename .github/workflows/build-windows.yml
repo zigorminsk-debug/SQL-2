@@ -1,0 +1,156 @@
+name: SQL Monitor - Windows EXE
+
+on:
+  push:
+    branches: [main, 'arena/**']
+    paths:
+      - 'mssql-monitor-go/**'
+      - 'mssql-monitor/**'
+      - '.github/workflows/build-windows.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'mssql-monitor-go/**'
+      - 'mssql-monitor/**'
+      - '.github/workflows/build-windows.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sql-monitor-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GOTOOLCHAIN: local
+  GO_TELEMETRY: 'off'
+
+jobs:
+  tests:
+    name: SQL Monitor tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: mssql-monitor-go/go.mod
+          cache-dependency-path: mssql-monitor-go/go.sum
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Go tests with race detection and vet
+        working-directory: mssql-monitor-go
+        run: |
+          go telemetry off
+          go mod verify
+          go test -race -count=1 ./...
+          go vet ./...
+      - name: Browser shutdown regression tests
+        run: node mssql-monitor-go/webui_test.cjs
+      - name: Python regression tests
+        run: python -m unittest discover -s mssql-monitor -p 'test_*.py' -v
+
+  go-windows:
+    name: Go - Windows x64 GUI and CLI
+    needs: tests
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: mssql-monitor-go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: mssql-monitor-go/go.mod
+          cache-dependency-path: mssql-monitor-go/go.sum
+      - name: Build standalone EXE files
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: '0'
+        run: |
+          go telemetry off
+          go build -trimpath -ldflags '-s -w -H windowsgui' -o release/MSSQLMonitor.exe .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go build -trimpath -ldflags '-s -w' -o release/MSSQLMonitorCLI.exe .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Smoke test packaged CLI and generate demo report
+        run: |
+          & ./release/MSSQLMonitorCLI.exe -version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & ./release/MSSQLMonitorCLI.exe -demo-report -workload erp
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Move-Item -Force release/reports/demo_report.html release/demo_report.html
+          Copy-Item README.md release/README.md
+          "Commit: $env:GITHUB_SHA`nRun: $env:GITHUB_RUN_NUMBER`nCLI: MSSQLMonitorCLI.exe -cli -server YOUR-SERVER" | Set-Content release/BUILD_INFO.txt
+          Get-ChildItem release/*.exe | ForEach-Object {
+            "$( (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower() )  $($_.Name)"
+          } | Set-Content release/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MSSQLMonitor-Go-windows-x64
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            mssql-monitor-go/release/MSSQLMonitor.exe
+            mssql-monitor-go/release/MSSQLMonitorCLI.exe
+            mssql-monitor-go/release/demo_report.html
+            mssql-monitor-go/release/README.md
+            mssql-monitor-go/release/BUILD_INFO.txt
+            mssql-monitor-go/release/SHA256SUMS.txt
+
+  python-windows:
+    name: Python - Windows x64 GUI and CLI
+    needs: tests
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: mssql-monitor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+          cache: pip
+          cache-dependency-path: mssql-monitor/requirements.txt
+      - name: Install build dependencies
+        run: python -m pip install -r requirements.txt pyinstaller
+      - name: Build standalone EXE files
+        run: |
+          python -m PyInstaller --clean --noconfirm --onefile --windowed --icon icon.ico --name MSSQLMonitor --collect-all pymssql app.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m PyInstaller --clean --noconfirm --onefile --console --icon icon.ico --name MSSQLMonitorCLI --collect-all pymssql app.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Smoke test packaged CLI and generate demo report
+        run: |
+          & ./dist/MSSQLMonitorCLI.exe --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & ./dist/MSSQLMonitorCLI.exe --demo-report dist/demo_report.html
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item README.md dist/README.md
+          "Commit: $env:GITHUB_SHA`nRun: $env:GITHUB_RUN_NUMBER`nCLI: MSSQLMonitorCLI.exe --cli --server YOUR-SERVER" | Set-Content dist/BUILD_INFO.txt
+          Get-ChildItem dist/*.exe | ForEach-Object {
+            "$( (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower() )  $($_.Name)"
+          } | Set-Content dist/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MSSQLMonitor-Python-windows-x64
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            mssql-monitor/dist/MSSQLMonitor.exe
+            mssql-monitor/dist/MSSQLMonitorCLI.exe
+            mssql-monitor/dist/demo_report.html
+            mssql-monitor/dist/README.md
+            mssql-monitor/dist/BUILD_INFO.txt
+            mssql-monitor/dist/SHA256SUMS.txt

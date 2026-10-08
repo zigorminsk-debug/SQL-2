@@ -1,15 +1,16 @@
 @echo off
 rem ============================================================
 rem  MS SQL Monitor (Go) — сборка Windows-бинарников
-rem  Требуется установленный Go 1.21+ (https://go.dev/dl/)
+rem  Требуется установленный Go 1.27.1+ (https://go.dev/dl/)
 rem ============================================================
+cd /d "%~dp0"
 where go >nul 2>nul
 if errorlevel 1 (
     echo ОШИБКА: Go не найден в PATH. Установите с https://go.dev/dl/
     exit /b 1
 )
 
-echo [1/3] Проверка сборки (Linux-сборка как smoke-тест)...
+echo [1/3] Проверка сборки для текущей системы...
 go build -o NUL . || exit /b 1
 
 echo [2/3] Сборка GUI-версии (MSSQLMonitor.exe, без консоли, с иконкой)...

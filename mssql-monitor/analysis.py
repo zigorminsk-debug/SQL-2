@@ -8,6 +8,11 @@ analysis.py — аналитика и рекомендации.
   * Оценка «здоровья» сервера (0..100).
 """
 
+ARTICLE_DEPLOYMENT = "https://habr.com/ru/articles/1079630/"
+ARTICLE_OPERATION = "https://habr.com/ru/articles/1080996/"
+RCSI_ADVICE = "Сначала проверьте режим блокировок и совместимость конфигурации 1С. RCSI влияет только на READ COMMITTED, не устраняет REPEATABLE READ/SERIALIZABLE и конфликты писателей. Перевод в управляемый режим требует доработки и тестирования кода 1С. Оцените место под версии строк в tempdb (при ADR — PVS), длинные транзакции и окно обслуживания; согласуйте изменение с DBA. Не включайте принудительный откат рабочих транзакций."
+PARALLEL_ADVICE = "Подберите MAXDOP по доступным online CPU и NUMA, а cost threshold — по планам, CPU и дельтам ожиданий за рабочий период. Для тяжёлой ERP параллелизм полезен отчётам; для множества бухгалтерских баз важнее конкуренция. Универсальных 1, 8 или 25–50 нет. Меняйте один параметр за раз, сравнивайте с эталонным периодом и проверяйте регрессии в Query Store. Сам по себе CXPACKET не является ошибкой."
+
 # =====================================================================
 # БАЗА ЗНАНИЙ ПО ОЖИДАНИЯМ
 # =====================================================================
@@ -23,7 +28,7 @@ WAIT_CATEGORIES = {
              "desc": "Ожидание блокировок (LOCK) — одни транзакции мешают другим. "
                      "Типично для длинных транзакций и последовательного изменения "
                      "«горячих» строк.",
-             "actions": ["Включить изоляцию моментальных снимков (RCSI) для базы",
+             "actions": [RCSI_ADVICE,
                          "Сократить длительность транзакций, проверять индексы WHERE/JOIN",
                          "Избегать изменения ключей и «горячих» таблиц длинными транзакциями"]},
     "latch": {"title": "Защёлки (latch)",
@@ -144,15 +149,15 @@ WAIT_TYPES = {
         ["Проверить tempdb и тяжёлые операции DML"]),
     "LCK_M_IS": ("lock", "Блокировка: намерение-разделяемая",
         "Запросы ждут установки блокировки намерения. Смотрите общие рекомендации по "
-        "блокировкам.", ["Сократить транзакции", "Включить RCSI"]),
+        "блокировкам.", ["Сократить транзакции", RCSI_ADVICE]),
     "LCK_M_S": ("lock", "Блокировка: разделяемая (S)",
-        "Читатели ждут завершения пишущих транзакций.", ["Сократить транзакции", "Включить RCSI"]),
+        "Читатели ждут завершения пишущих транзакций.", ["Сократить транзакции", RCSI_ADVICE]),
     "LCK_M_U": ("lock", "Блокировка: обновления (U)",
         "Ожидание блокировки обновления (типично для UPDATE с поиском).",
         ["Проверить индексы по условиям WHERE у UPDATE"]),
     "LCK_M_X": ("lock", "Блокировка: эксклюзивная (X)",
         "Транзакции ждут эксклюзивного доступа — длинные пишущие транзакции блокируют других.",
-        ["Сократить длительность транзакций", "Включить RCSI",
+        ["Сократить длительность транзакций", RCSI_ADVICE,
          "Проверить, нет ли эскалации блокировок"]),
     "LCK_M_IX": ("lock", "Блокировка: намерение-эксклюзивная",
         "Ожидание блокировки намерения на изменение.",
@@ -402,8 +407,7 @@ def _window_reasons(w):
             "сессия %s — %s с (%s)" % (q.get("session_id"), q.get("elapsed_s"),
                                        (q.get("text_head") or "")[:60]) for q in top))
     if w["ple_min"] and w["ple_min"] < 300:
-        reasons.append("Page life expectancy опускался до %d с (<300) — буферному пулу не "
-                       "хватало памяти." % w["ple_min"])
+        reasons.append("Page life expectancy опускался до %d с (<300 — эвристика). Сопоставьте с эталоном и физическими чтениями." % w["ple_min"])
     if not reasons:
         reasons.append("Повышенная активность без явных ожиданий: вероятно, плановая нагрузка "
                        "(отчёты, задания). Проверьте, какие задания запускались в это время.")
@@ -431,99 +435,20 @@ def build_findings(data, samples=None, blocking_events=None, long_queries=None):
     phys_gb = phys_kb / 1048576.0 if phys_kb else None
     cpu_count = _inum(sysinfo.get("cpu_count"))
 
-    # ---------- 1. Память сервера ----------
-    try:
-        m = cfg.get("max server memory (MB)")
-        if m is not None:
-            cur = _fnum(m.get("value_in_use"))
-            if phys_gb:
-                if cur is not None and cur >= 2147483647 or cur == 2147483647:
-                    rec = int(phys_gb * 1024 * 0.75)
-                    F.append(_finding(
-                        "MEM-01", "warning", "Память",
-                        "Max server memory не ограничена",
-                        ["Текущее значение: 2147483647 МБ (по умолчанию, без ограничения)",
-                         "Физическая память сервера: %.1f ГБ" % phys_gb],
-                        "SQL Server может занять всю память ОС, оставив системе недостаточно — "
-                        "это приводит к вытеснению в файл подкачки и деградации всей машины.",
-                        "Установите лимит ~70–80% физической памяти для выделенного сервера "
-                        "(оставьте 4–8 ГБ ОС; больше — если на сервере работают другие службы).",
-                        "EXEC sys.sp_configure N'show advanced options', 1; RECONFIGURE;\n"
-                        "EXEC sys.sp_configure N'max server memory (MB)', %d; RECONFIGURE;"
-                        % rec))
-                elif cur is not None and phys_gb * 1024 * 0.95 < cur < 2147483647:
-                    F.append(_finding(
-                        "MEM-02", "warning", "Память",
-                        "Max server memory почти равна физической памяти",
-                        ["Текущее значение: %s МБ, физическая память: %.1f ГБ" %
-                         (int(cur), phys_gb)],
-                        "Серверу БД оставлено слишком мало памяти — возможны вытеснение в "
-                        "файл подкачки и общие замедления ОС.",
-                        "Снизьте лимит, оставив ОС минимум 4 ГБ (или 8–10% памяти).",
-                        "EXEC sys.sp_configure N'show advanced options', 1; RECONFIGURE;\n"
-                        "EXEC sys.sp_configure N'max server memory (MB)', %d; RECONFIGURE;"
-                        % max(1024, int(phys_gb * 1024 * 0.8))))
-                elif cur is not None and cur < 4096:
-                    F.append(_finding(
-                        "MEM-03", "info", "Память",
-                        "Max server memory заметно меньше физической памяти",
-                        ["Текущее значение: %s МБ, физическая память: %.1f ГБ" %
-                         (int(cur), phys_gb)],
-                        "Если на сервере нет других крупных сервисов, SQL Server мог бы "
-                        "использовать больше памяти под буферный пул.",
-                        "Проверьте, не искусственно ли занижен лимит; при возможности "
-                        "увеличьте его.", None))
-    except Exception:
-        pass
-
-    # ---------- 2. MAXDOP ----------
-    try:
-        m = cfg.get("max degree of parallelism")
-        if m is not None and cpu_count:
-            cur = _fnum(m.get("value_in_use"))
-            if cur == 0 and cpu_count >= 8:
-                F.append(_finding(
-                    "DOP-01", "warning", "Параллелизм",
-                    "MAXDOP не ограничен (0) при %d логических ядрах" % cpu_count,
-                    ["max degree of parallelism = 0 (все ядра)",
-                     "Ядер: %d" % cpu_count],
-                    "Один тяжёлый запрос может занять все ядра и «подвесить» остальные. "
-                    "Для OLTP-нагрузок это частая причина резких замедлений.",
-                    "Для смешанной OLTP-нагрузки установите MAXDOP = 8 (или число ядер одного "
-                    "сокета/NUMA-узла), а cost threshold — 25–50.",
-                    "EXEC sys.sp_configure N'show advanced options', 1; RECONFIGURE;\n"
-                    "EXEC sys.sp_configure N'max degree of parallelism', 8; RECONFIGURE;"))
-            elif cur is not None and cur > cpu_count:
-                F.append(_finding("DOP-02", "warning", "Параллелизм",
-                                  "MAXDOP больше числа ядер",
-                                  ["MAXDOP = %s, ядер: %d" % (int(cur), cpu_count)],
-                                  "Значение превышает физически доступные ядра и не даёт "
-                                  "преимущества.",
-                                  "Установите MAXDOP не больше числа ядер одного NUMA-узла.",
-                                  "EXEC sys.sp_configure N'max degree of parallelism', 8; "
-                                  "RECONFIGURE;"))
-    except Exception:
-        pass
-
-    # ---------- 3. cost threshold for parallelism ----------
-    try:
-        m = cfg.get("cost threshold for parallelism")
-        if m is not None:
-            cur = _fnum(m.get("value_in_use"))
-            if cur is not None and cur <= 5:
-                F.append(_finding(
-                    "DOP-03", "info", "Параллелизм",
-                    "Cost threshold for parallelism = %d (значение по умолчанию)" % cur,
-                    ["Даже дешёвые запросы выполняются параллельно"],
-                    "Значение 5 (по умолчанию с SQL 7.0) слишком мало для современного "
-                    "железа: мелкие запросы запускаются параллельно, создавая лишние "
-                    "CXPACKET-ожидания.",
-                    "Увеличьте порог до 25–50 и наблюдайте за CXPACKET.",
-                    "EXEC sys.sp_configure N'show advanced options', 1; RECONFIGURE;\n"
-                    "EXEC sys.sp_configure N'cost threshold for parallelism', 25; "
-                    "RECONFIGURE;"))
-    except Exception:
-        pass
+    # Resource limits require measured workload and NUMA context.
+    m = cfg.get("max server memory (MB)") or {}
+    cur = _fnum(m.get("value_in_use"))
+    if phys_gb and cur is not None and (cur >= 2147483647 or cur > phys_gb * 1024 * .95):
+        F.append(_finding("MEM-01", "warning", "Память", "Проверьте резерв памяти ОС",
+            ["max server memory = %s МБ; ОЗУ = %.1f ГБ" % (cur, phys_gb), ARTICLE_DEPLOYMENT],
+            "Неограниченный лимит или резерв менее 5% требует проверки давления на ОС.",
+            "Задайте лимит по пику потребления ОС, служб и других инстансов, а не фиксированным 75%. Пример статьи: резерв 6 ГБ при 8 ядрах/32 ГБ; это не универсальная формула. Проверьте LPIM и резерв памяти гипервизора.", None))
+    for name, fid in [("max degree of parallelism", "DOP-01"), ("cost threshold for parallelism", "DOP-03")]:
+        cur = _fnum((cfg.get(name) or {}).get("value_in_use"))
+        if cur is not None and ((name.startswith("max") and (cur in (0, 1) or (cpu_count and cur > cpu_count))) or (name.startswith("cost") and cur <= 5)):
+            F.append(_finding(fid, "info", "Параллелизм", name + ": проверить профиль нагрузки",
+                ["Фактически: %s" % cur, ARTICLE_OPERATION],
+                "Значение параметра само по себе не доказывает причину замедления.", PARALLEL_ADVICE, None))
 
     # ---------- 4. optimize for ad hoc workloads ----------
     try:
@@ -631,8 +556,7 @@ def build_findings(data, samples=None, blocking_events=None, long_queries=None):
                                          for r in rows[:5] if wait_info(r["wait_type"])[0] == "lock")],
                     "Транзакции ждут друг друга — пользовательские запросы «тормозят» из-за "
                     "конкуренции за строки/таблицы.",
-                    "Включите RCSI для проблемных баз, сократите транзакции, проверьте "
-                    "индексы у DML-операций и блокирующие цепочки в отчёте.", None))
+                    RCSI_ADVICE, None))
             elif cat == "cpu" and "WAIT-CPU" not in [f["id"] for f in F]:
                 F.append(_finding(
                     "WAIT-CPU", "warning", "CPU",
@@ -682,13 +606,11 @@ def build_findings(data, samples=None, blocking_events=None, long_queries=None):
             below = len([p for p in ples if p < 300])
             if below >= max(3, len(ples) * 0.1):
                 F.append(_finding(
-                    "MEM-PRESS", "warning", "Память",
+                    "MEM-PRESS", "info", "Память",
                     "Page life expectancy регулярно ниже 300 с (минимум %d)" % ple_min,
                     ["Точек с PLE<300: %d из %d" % (below, len(ples))],
-                    "Страницы данных слишком быстро покидают буферный пул — данных больше, "
-                    "чем помещается в память. Отсюда лишние дисковые чтения.",
-                    "Увеличьте память/max server memory, сократите лишние сканирования "
-                    "(индексы, статистика).", None))
+                    "300 с — эвристика, не универсальный норматив PLE.",
+                    "Сравните с эталоном системы, lazy writes и физическими чтениями. Проверьте планы и сканы до решения об увеличении памяти.", None))
         lazy = [_fnum(s.get("lazy_writes")) for s in samples]
         lazy = [x for x in lazy if x is not None]
         if lazy and sum(lazy) / len(lazy) > 20:
@@ -721,10 +643,7 @@ def build_findings(data, samples=None, blocking_events=None, long_queries=None):
                  "Худшая: %s" % worst_ev],
                 "Одни сессии удерживали блокировки, другие ждали. Это прямая причина "
                 "«зависаний» запросов у пользователей.",
-                "1) Найдите виновника в разделе «Блокировки» (текст запроса приложен). "
-                "2) Сократите его транзакцию. 3) Для баз с частыми блокировками включите RCSI.",
-                "-- Включение RCSI (по одной базе, после проверки):\n"
-                "ALTER DATABASE [YourDB] SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE;"))
+                "Найдите блокирующую сессию, сократите транзакцию и проверьте индексы. " + RCSI_ADVICE, None))
         live = data.get("requests_live") or {}
         if (live.get("blockers") or []) and not blocking_events:
             F.append(_finding(
@@ -754,7 +673,7 @@ def build_findings(data, samples=None, blocking_events=None, long_queries=None):
                 "разный порядок доступа к таблицам или отсутствие подходящих индексов.",
                 "1) Выровняйте порядок доступа к таблицам в приложении. "
                 "2) Проверьте индексы по условиям конфликтных запросов. "
-                "3) Рассмотрите RCSI — устраняет большинство deadlock-ов чтения/записи.",
+                "3) " + RCSI_ADVICE,
                 None))
     except Exception:
         pass
@@ -1156,7 +1075,7 @@ def build_findings(data, samples=None, blocking_events=None, long_queries=None):
         files = (data.get("databases") or {}).get("files") or []
         pct = [f for f in files if _inum(f.get("is_percent_growth")) == 1]
         tiny = [f for f in files if _inum(f.get("is_percent_growth")) == 0
-                and (_fnum(f.get("growth")) or 0) * 8 < 64]  # <64 МБ
+                and 0 < (_fnum(f.get("growth")) or 0) * 8 / 1024 < 64]  # <64 МБ
         if pct:
             F.append(_finding(
                 "FILE-GROW", "info", "Файлы",
@@ -1230,29 +1149,13 @@ def build_findings(data, samples=None, blocking_events=None, long_queries=None):
     except Exception:
         pass
 
-    # ---------- 28. RCSI при блокировках ----------
-    try:
-        if blocking_events or (data.get("wait_stats") or {}).get("rows"):
-            rows = (data.get("wait_stats") or {})["rows"]
-            cats = wait_category_totals(rows)
-            tot = sum(cats.values()) or 1
-            if cats.get("lock", 0) / tot > 0.1:
-                dbs = (data.get("databases") or {}).get("databases") or []
-                nordsi = [d for d in dbs if not d.get("is_system") and
-                          _inum(d.get("is_read_committed_snapshot_on")) == 0]
-                if nordsi:
-                    F.append(_finding(
-                        "RCSI-01", "info", "Блокировки",
-                        "Доля lock-ожиданий >10%, RCSI не включён ни в одной базе",
-                        ["Базы без RCSI: %d" % len(nordsi)],
-                        "Изоляция фиксации чтения с моментальным снимком (RCSI) устраняет "
-                        "блокировки читателей писателями без изменения приложений.",
-                        "Включите RCSI для баз с конфликтами чтение/запись (после проверки "
-                        "нагрузки на tempdb).",
-                        "ALTER DATABASE [%s] SET READ_COMMITTED_SNAPSHOT ON;"
-                        % nordsi[0]["name"]))
-    except Exception:
-        pass
+    # The legacy Python report has no workload selector: don't infer the 1C
+    # isolation mode or recommend enabling RCSI from instance-wide waits.
+    for f in F:
+        if f["id"].startswith("WAIT-"):
+            f["severity"] = "info"
+            f["evidence"].append("Накопленные ожидания с перезапуска; не доказательство текущей проблемы. " + ARTICLE_OPERATION)
+            f["action"] += " Сопоставьте с дельтами за рабочий период и спокойным эталоном."
 
     # порядок: критично -> важно -> инфо
     order = {"critical": 0, "warning": 1, "info": 2}

@@ -2,10 +2,12 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -31,12 +33,20 @@ type App struct {
 	reportMsg  string
 	reportErr  string
 
-	exitCh chan struct{}
-	once   sync.Once
+	lifeMu     sync.Mutex
+	closing    bool
+	work       sync.WaitGroup
+	ctx        context.Context
+	cancel     context.CancelFunc
+	stopOnce   sync.Once
+	httpServer *http.Server
+	exitCh     chan struct{}
+	once       sync.Once
 }
 
 func NewApp(cfg *Config, lg *Logger) *App {
-	return &App{cfg: cfg, log: lg, exitCh: make(chan struct{})}
+	ctx, cancel := context.WithCancel(context.Background())
+	return &App{cfg: cfg, log: lg, exitCh: make(chan struct{}), ctx: ctx, cancel: cancel}
 }
 
 func (a *App) Store() *Store {
@@ -77,6 +87,8 @@ func writeJSON(w http.ResponseWriter, v any) {
 }
 
 func writeErr(w http.ResponseWriter, code int, msg string) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(code)
 	writeJSON(w, map[string]any{"ok": false, "error": msg})
 }
 
@@ -90,7 +102,7 @@ func (a *App) handleState(w http.ResponseWriter, r *http.Request) {
 		"driver":     "",
 		"monitor_on": a.monitor != nil && a.monitor.Alive(),
 		"monitor_n":  0,
-		"config":     a.cfg,
+		"config":     *a.cfg,
 	}
 	if a.db != nil {
 		out["server"] = a.db.ServerName()
@@ -153,7 +165,9 @@ func (a *App) handleConnect(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, "укажите сервер")
 		return
 	}
+	a.mu.Lock()
 	cfg := *a.cfg
+	a.mu.Unlock()
 	cfg.Server = strings.TrimSpace(req.Server)
 	cfg.Port = req.Port
 	if cfg.Port == 0 {
@@ -174,7 +188,7 @@ func (a *App) handleConnect(w http.ResponseWriter, r *http.Request) {
 	}
 	db := NewDatabase(cfg.Server, cfg.Database, cfg.WindowsAuth, cfg.User,
 		req.Password, cfg.Port, encrypt != "disable", true)
-	if err := db.Connect(); err != nil {
+	if err := db.ConnectContext(a.ctx); err != nil {
 		a.log.Infof("Ошибка подключения к %s: %v", cfg.Server, err)
 		writeErr(w, 502, "Не удалось подключиться: "+err.Error())
 		return
@@ -186,8 +200,10 @@ func (a *App) handleConnect(w http.ResponseWriter, r *http.Request) {
 			err.Error())
 		return
 	}
+	a.mu.Lock()
 	*a.cfg = cfg
 	a.cfg.Save()
+	a.mu.Unlock()
 	a.Connect(db)
 	a.log.Infof("Подключено: %s (база: %s)", db.ServerName(), cfg.Database)
 	writeJSON(w, map[string]any{"ok": true, "server": db.ServerName(), "demo": false})
@@ -203,6 +219,7 @@ func (a *App) handleDisconnect(w http.ResponseWriter, r *http.Request) {
 func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		var in struct {
+			Workload     string  `json:"workload"`
 			IntervalSec  int     `json:"interval_sec"`
 			DurationH    float64 `json:"duration_h"`
 			LongQuerySec float64 `json:"long_query_sec"`
@@ -215,7 +232,14 @@ func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, 400, "некорректный запрос")
 			return
 		}
+		if in.Workload != "" && !validWorkload(in.Workload) {
+			writeErr(w, 400, "неизвестный профиль нагрузки")
+			return
+		}
 		a.mu.Lock()
+		if in.Workload != "" {
+			a.cfg.Workload = in.Workload
+		}
 		if in.IntervalSec >= 5 {
 			a.cfg.Interval = in.IntervalSec
 		}
@@ -237,12 +261,15 @@ func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
 		if in.PlanXML != nil {
 			a.cfg.PlanXMLCheck = *in.PlanXML
 		}
+		cfg := *a.cfg
 		a.mu.Unlock()
-		a.cfg.Save()
-		a.log.Infof("Настройки сохранены: интервал %d с, длительность %d ч",
-			a.cfg.Interval, a.cfg.DurationHours)
+		cfg.Save()
+		a.log.Infof("Настройки сохранены: интервал %d с, длительность %d ч", cfg.Interval, cfg.DurationHours)
 	}
-	writeJSON(w, a.cfg)
+	a.mu.Lock()
+	cfg := *a.cfg
+	a.mu.Unlock()
+	writeJSON(w, cfg)
 }
 
 func (a *App) handleMonitorStart(w http.ResponseWriter, r *http.Request) {
@@ -263,7 +290,9 @@ func (a *App) handleMonitorStart(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, "не удалось открыть хранилище данных")
 		return
 	}
-	cfg := a.cfg
+	a.mu.Lock()
+	cfg := *a.cfg
+	a.mu.Unlock()
 	eng := NewMonitorEngine(db, st, time.Duration(cfg.Interval)*time.Second,
 		time.Duration(cfg.DurationHours)*time.Hour, cfg.LongQueryS)
 	eng.OnLog = func(msg string) { a.log.Infof("%s", msg) }
@@ -275,15 +304,21 @@ func (a *App) handleMonitorStart(w http.ResponseWriter, r *http.Request) {
 		a.mu.Unlock()
 		a.log.Infof("Мониторинг завершён. Тиков: %d, ошибок опроса: %d",
 			e.Samples, e.Errors)
-		if auto {
-			go a.runReport("Автоотчёт по завершении мониторинга")
+		if auto && !e.Stopped() {
+			a.runReport("Автоотчёт по завершении мониторинга")
 		}
 	}
 	a.mu.Lock()
+	if a.monitor != nil && a.monitor.Alive() {
+		a.mu.Unlock()
+		eng.Stop()
+		writeErr(w, 409, "мониторинг уже запущен")
+		return
+	}
 	a.monitor = eng
 	a.monitorOn = true
-	a.mu.Unlock()
 	eng.Start()
+	a.mu.Unlock()
 	writeJSON(w, map[string]any{"ok": true})
 }
 
@@ -295,10 +330,10 @@ func (a *App) handleMonitorStop(w http.ResponseWriter, r *http.Request) {
 func (a *App) StopMonitor(logIt bool) {
 	a.mu.Lock()
 	eng := a.monitor
-	a.monitor = nil
 	a.mu.Unlock()
 	if eng != nil && eng.Alive() {
 		eng.Stop()
+		eng.Wait()
 		if logIt {
 			a.log.Infof("Мониторинг остановлен пользователем")
 		}
@@ -329,9 +364,13 @@ func (a *App) handleSamples(w http.ResponseWriter, r *http.Request) {
 
 // runReport — фоновое выполнение глубокой диагностики + генерация отчёта.
 func (a *App) runReport(reason string) {
+	if !a.beginWork() {
+		return
+	}
 	a.reportMu.Lock()
 	if a.reportRun {
 		a.reportMu.Unlock()
+		a.work.Done()
 		return
 	}
 	a.reportRun = true
@@ -340,6 +379,7 @@ func (a *App) runReport(reason string) {
 	a.reportMu.Unlock()
 
 	go func() {
+		defer a.work.Done()
 		defer func() {
 			a.reportMu.Lock()
 			a.reportRun = false
@@ -355,9 +395,11 @@ func (a *App) runReport(reason string) {
 		}
 		a.log.Infof("Начата глубокая диагностика (%s)…", reason)
 		a.mu.Lock()
-		opts := CheckOptions{Fragmentation: a.cfg.FragCheck,
+		interval := a.cfg.Interval
+		opts := CheckOptions{Workload: a.cfg.Workload, Fragmentation: a.cfg.FragCheck,
 			ErrorLog: a.cfg.ErrorLogCheck, PlanXML: a.cfg.PlanXMLCheck}
 		a.mu.Unlock()
+		db = scopedQuerier{db, a.ctx}
 		t := time.Now()
 		stx := a.Store()
 		var preBlocking []BlockingEvent
@@ -374,6 +416,9 @@ func (a *App) runReport(reason string) {
 			a.reportMsg = "Сбор данных: " + stage
 			a.reportMu.Unlock()
 		}, preBlocking, preLong)
+		if a.ctx.Err() != nil {
+			return
+		}
 		if stx != nil {
 			samples, _ = stx.LoadSamples(0, 0)
 			blocking, _ = stx.LoadBlocking(0, 0)
@@ -383,10 +428,13 @@ func (a *App) runReport(reason string) {
 			ServerDisplay: db.ServerName(),
 			ServerFull:    db.ServerName(),
 			GeneratedStr:  time.Now().Format("02.01.2006 15:04:05"),
-			Interval:      a.cfg.Interval,
+			Interval:      interval,
 			Driver:        db.DriverName(),
 		}
 		html, health, findings, _ := BuildReport(deep, samples, blocking, longq, meta)
+		if a.ctx.Err() != nil {
+			return
+		}
 		path := saveReport(html)
 		fname := filepath.Base(path)
 		a.log.Infof("Отчёт готов: %s (находок: %d, оценка: %d/100, за %.1f с)",
@@ -412,7 +460,7 @@ func (a *App) handleReportStart(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 409, "отчёт уже формируется")
 		return
 	}
-	go a.runReport("по запросу пользователя")
+	a.runReport("по запросу пользователя")
 	writeJSON(w, map[string]any{"ok": true})
 }
 
@@ -427,7 +475,12 @@ func (a *App) handleReportStatus(w http.ResponseWriter, r *http.Request) {
 
 // handleDemoReport — сформировать демо-отчёт (без сервера).
 func (a *App) handleDemoReport(w http.ResponseWriter, r *http.Request) {
+	if !a.beginWork() {
+		writeErr(w, 503, "программа завершается")
+		return
+	}
 	go func() {
+		defer a.work.Done()
 		a.reportMu.Lock()
 		if a.reportRun {
 			a.reportMu.Unlock()
@@ -443,6 +496,9 @@ func (a *App) handleDemoReport(w http.ResponseWriter, r *http.Request) {
 			a.reportMu.Unlock()
 		}()
 		path, health, findings := a.buildDemoReport()
+		if a.ctx.Err() != nil {
+			return
+		}
 		a.log.Infof("Демо-отчёт готов: %s (находок: %d, оценка: %d/100)",
 			filepath.Base(path), len(findings), health.Score)
 		a.reportMu.Lock()
@@ -456,8 +512,14 @@ func (a *App) handleDemoReport(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) buildDemoReport() (string, Health, []Finding) {
 	db := NewDemoDatabase()
-	opts := CheckOptions{Fragmentation: true, ErrorLog: true, PlanXML: true}
-	deep := collectDeep(db, opts, nil, nil, nil)
+	a.mu.Lock()
+	workload := a.cfg.Workload
+	a.mu.Unlock()
+	opts := CheckOptions{Workload: workload, Fragmentation: true, ErrorLog: true, PlanXML: true}
+	deep := collectDeep(scopedQuerier{db, a.ctx}, opts, nil, nil, nil)
+	if a.ctx.Err() != nil {
+		return "", Health{}, nil
+	}
 	samples := generateDemoSamples(60, 24)
 	blocking, longq := generateDemoEvents(samples)
 	meta := ReportMeta{
@@ -468,6 +530,9 @@ func (a *App) buildDemoReport() (string, Health, []Finding) {
 		Driver:        db.DriverName(),
 	}
 	html, health, findings, _ := BuildReport(deep, samples, blocking, longq, meta)
+	if a.ctx.Err() != nil {
+		return "", Health{}, nil
+	}
 	os.MkdirAll(reportsDir(), 0o755)
 	path := filepath.Join(reportsDir(), "demo_report.html")
 	os.WriteFile(path, []byte(html), 0o644)
@@ -500,12 +565,28 @@ func (a *App) handleReportsList(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleExit(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", "POST")
+		writeErr(w, 405, "требуется POST")
+		return
+	}
+	if r.Header.Get("Content-Type") != "application/json" {
+		writeErr(w, 415, "требуется application/json")
+		return
+	}
+	if origin := r.Header.Get("Origin"); origin != "" {
+		u, err := url.Parse(origin)
+		if err != nil || u.Host != r.Host {
+			writeErr(w, 403, "чужой Origin")
+			return
+		}
+	}
+	a.stopWork()
 	writeJSON(w, map[string]any{"ok": true})
-	a.StopMonitor(false)
-	go func() {
-		time.Sleep(300 * time.Millisecond)
-		a.once.Do(func() { close(a.exitCh) })
-	}()
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
+	go a.Shutdown()
 }
 
 // StartWebServer — HTTP-сервер встроенного GUI. Возвращает порт.
@@ -519,18 +600,18 @@ func (a *App) StartWebServer(host string, port int) (int, error) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write([]byte(indexHTML))
 	})
-	mux.HandleFunc("/api/state", a.handleState)
-	mux.HandleFunc("/api/connect", a.handleConnect)
-	mux.HandleFunc("/api/disconnect", a.handleDisconnect)
-	mux.HandleFunc("/api/settings", a.handleSettings)
-	mux.HandleFunc("/api/monitor/start", a.handleMonitorStart)
-	mux.HandleFunc("/api/monitor/stop", a.handleMonitorStop)
-	mux.HandleFunc("/api/log", a.handleLog)
-	mux.HandleFunc("/api/samples", a.handleSamples)
-	mux.HandleFunc("/api/report/start", a.handleReportStart)
-	mux.HandleFunc("/api/report/status", a.handleReportStatus)
-	mux.HandleFunc("/api/demo-report", a.handleDemoReport)
-	mux.HandleFunc("/api/reports", a.handleReportsList)
+	mux.HandleFunc("/api/state", a.apiHandler(a.handleState, false))
+	mux.HandleFunc("/api/connect", a.apiHandler(a.handleConnect, true))
+	mux.HandleFunc("/api/disconnect", a.apiHandler(a.handleDisconnect, true))
+	mux.HandleFunc("/api/settings", func(w http.ResponseWriter, r *http.Request) { a.apiHandler(a.handleSettings, r.Method != "GET")(w, r) })
+	mux.HandleFunc("/api/monitor/start", a.apiHandler(a.handleMonitorStart, true))
+	mux.HandleFunc("/api/monitor/stop", a.apiHandler(a.handleMonitorStop, true))
+	mux.HandleFunc("/api/log", a.apiHandler(a.handleLog, false))
+	mux.HandleFunc("/api/samples", a.apiHandler(a.handleSamples, false))
+	mux.HandleFunc("/api/report/start", a.apiHandler(a.handleReportStart, true))
+	mux.HandleFunc("/api/report/status", a.apiHandler(a.handleReportStatus, false))
+	mux.HandleFunc("/api/demo-report", a.apiHandler(a.handleDemoReport, true))
+	mux.HandleFunc("/api/reports", a.apiHandler(a.handleReportsList, false))
 	mux.HandleFunc("/api/exit", a.handleExit)
 	fs := http.FileServer(http.Dir(reportsDir()))
 	mux.Handle("/reports/", http.StripPrefix("/reports/", neuterDir(fs)))
@@ -540,7 +621,8 @@ func (a *App) StartWebServer(host string, port int) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	go http.Serve(ln, mux)
+	a.httpServer = &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+	go a.httpServer.Serve(ln)
 	return ln.Addr().(*net.TCPAddr).Port, nil
 }
 

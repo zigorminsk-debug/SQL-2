@@ -24,6 +24,7 @@ type Database struct {
 	TrustCert    bool
 	LoginTimeout int
 
+	ctx        context.Context
 	pool       *sql.DB
 	driverName string
 }
@@ -70,14 +71,17 @@ func (d *Database) dsn() string {
 	return strings.Join(parts, ";")
 }
 
-func (d *Database) Connect() error {
+func (d *Database) Connect() error { return d.ConnectContext(context.Background()) }
+
+func (d *Database) ConnectContext(parent context.Context) error {
+	d.ctx = parent
 	pool, err := sql.Open("sqlserver", d.dsn())
 	if err != nil {
 		return fmt.Errorf("не удалось подготовить подключение: %w", err)
 	}
 	pool.SetMaxOpenConns(2)
 	pool.SetConnMaxIdleTime(5 * time.Minute)
-	ctx, cancel := context.WithTimeout(context.Background(),
+	ctx, cancel := context.WithTimeout(parent,
 		time.Duration(d.LoginTimeout+5)*time.Second)
 	defer cancel()
 	if err := pool.PingContext(ctx); err != nil {
@@ -104,11 +108,21 @@ func (d *Database) Query(q string) ([]map[string]any, error) {
 	return d.QueryTimeout(q, 90*time.Second)
 }
 
+func (d *Database) QueryContext(ctx context.Context, q string) ([]map[string]any, error) {
+	return d.queryContext(ctx, q, 90*time.Second)
+}
 func (d *Database) QueryTimeout(q string, timeout time.Duration) ([]map[string]any, error) {
+	ctx := d.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return d.queryContext(ctx, q, timeout)
+}
+func (d *Database) queryContext(parent context.Context, q string, timeout time.Duration) ([]map[string]any, error) {
 	if d.pool == nil {
 		return nil, &simpleErr{"нет активного подключения"}
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
 	rows, err := d.pool.QueryContext(ctx, q)
 	if err != nil {

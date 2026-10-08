@@ -86,6 +86,10 @@ func gs(m map[string]any, k string) string {
 		return "0"
 	case float64:
 		return strconv.FormatFloat(x, 'f', -1, 64)
+	case int:
+		return strconv.Itoa(x)
+	case int32:
+		return strconv.FormatInt(int64(x), 10)
 	case int64:
 		return strconv.FormatInt(x, 10)
 	case time.Time:
@@ -195,7 +199,7 @@ type Sample struct {
 	Sessions        *int        `json:"sessions,omitempty"`
 	Blocked         int         `json:"blocked"`
 	BlockedMaxWait  float64     `json:"blocked_max_wait"`
-	Waits           []WaitDelta `json:"waits,omitempty"`
+	Waits           []WaitDelta `json:"waits"`
 }
 
 func (s *Sample) cpu() float64 {
@@ -304,6 +308,8 @@ type DeadlockInfo struct {
 }
 
 type DeepData struct {
+	Workload       string
+	FileVolumes    []map[string]any
 	Server         map[string]any
 	SysInfo        map[string]any
 	Configs        []map[string]any
@@ -333,6 +339,7 @@ type DeepData struct {
 }
 
 type CheckOptions struct {
+	Workload      string
 	Fragmentation bool
 	ErrorLog      bool
 	PlanXML       bool

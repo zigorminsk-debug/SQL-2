@@ -10,6 +10,13 @@ import (
 
 func BuildFindings(d *DeepData, samples []Sample, blocking []BlockingEvent,
 	longq []LongQuery) []Finding {
+	// Prefer interval deltas; never mix them with cumulative waits since restart.
+	copyData := *d
+	d = &copyData
+	periodWaits, measured := waitsForPeriod(samples)
+	if measured {
+		d.WaitStats = periodWaits
+	}
 	var F []Finding
 	cfg := map[string]map[string]any{}
 	for _, r := range d.Configs {
@@ -33,78 +40,27 @@ func BuildFindings(d *DeepData, samples []Sample, blocking []BlockingEvent,
 		return false
 	}
 
-	// ---------- 1. память сервера ----------
+	// ---------- memory and parallelism: observations, not universal prescriptions ----------
 	if m := cfg["max server memory (mb)"]; m != nil && physGB > 0 {
-		cur, _ := gf(m, "value_in_use")
-		if cur == 2147483647 || cur >= 2147483647 {
-			rec := int(physGB * 1024 * 0.75)
-			F = append(F, finding("MEM-01", "warning", "Память",
-				"Max server memory не ограничена",
-				[]string{"Текущее значение: 2147483647 МБ (по умолчанию, без ограничения)",
-					fmt.Sprintf("Физическая память сервера: %.1f ГБ", physGB)},
-				"SQL Server может занять всю память ОС, оставив системе недостаточно — это "+
-					"приводит к вытеснению в файл подкачки и деградации всей машины.",
-				"Установите лимит ~70–80% физической памяти для выделенного сервера "+
-					"(оставьте 4–8 ГБ ОС; больше — если на сервере работают другие службы).",
-				"EXEC sys.sp_configure N'show advanced options', 1; RECONFIGURE;\n"+
-					fmt.Sprintf("EXEC sys.sp_configure N'max server memory (MB)', %d; RECONFIGURE;", rec)))
-		} else if cur > physGB*1024*0.95 && cur < 2147483647 {
-			F = append(F, finding("MEM-02", "warning", "Память",
-				"Max server memory почти равна физической памяти",
-				[]string{fmt.Sprintf("Текущее значение: %d МБ, физическая память: %.1f ГБ",
-					int(cur), physGB)},
-				"Серверу БД оставлено слишком мало памяти — возможны вытеснение в файл "+
-					"подкачки и общие замедления ОС.",
-				"Снизьте лимит, оставив ОС минимум 4 ГБ (или 8–10% памяти).",
-				"EXEC sys.sp_configure N'show advanced options', 1; RECONFIGURE;\n"+
-					fmt.Sprintf("EXEC sys.sp_configure N'max server memory (MB)', %d; RECONFIGURE;",
-						int(physGB*1024*0.8))))
-		} else if cur < 4096 {
-			F = append(F, finding("MEM-03", "info", "Память",
-				"Max server memory заметно меньше физической памяти",
-				[]string{fmt.Sprintf("Текущее значение: %d МБ, физическая память: %.1f ГБ",
-					int(cur), physGB)},
-				"Если на сервере нет других крупных сервисов, SQL Server мог бы использовать "+
-					"больше памяти под буферный пул.",
-				"Проверьте, не искусственно ли занижен лимит; при возможности увеличьте его.", ""))
+		if cur, ok := gf(m, "value_in_use"); ok && (cur >= 2147483647 || cur > physGB*1024*0.95) {
+			F = append(F, finding("MEM-01", "warning", "Память", "Недостаточный или не заданный резерв памяти ОС",
+				[]string{fmt.Sprintf("max server memory = %.0f МБ; физическая память = %.1f ГБ", cur, physGB), "Источник: " + articleDeployment},
+				"Неограниченный лимит либо резерв менее 5% — повод проверить вытеснение и конкуренцию служб; max server memory не ограничивает всю память процесса SQL.",
+				"Рассчитайте резерв ОС, потоков, других инстансов и сервера 1С по пику потребления. В статье 6 ГБ при 8 ядрах/32 ГБ — пример, не универсальная формула; на больших системах резерв растёт. Проверьте LPIM и резерв памяти гипервизора. Не применяйте фиксированные 75% ко всем серверам.", ""))
 		}
 	}
-
-	// ---------- 2-3. параллелизм ----------
-	if m := cfg["max degree of parallelism"]; m != nil && cpuCount > 0 {
-		cur, _ := gf(m, "value_in_use")
-		if cur == 0 && cpuCount >= 8 {
-			F = append(F, finding("DOP-01", "warning", "Параллелизм",
-				fmt.Sprintf("MAXDOP не ограничен (0) при %d логических ядрах", cpuCount),
-				[]string{"max degree of parallelism = 0 (все ядра)",
-					fmt.Sprintf("Ядер: %d", cpuCount)},
-				"Один тяжёлый запрос может занять все ядра и «подвесить» остальные. Для "+
-					"OLTP-нагрузок это частая причина резких замедлений.",
-				"Для смешанной OLTP-нагрузки установите MAXDOP = 8 (или число ядер одного "+
-					"сокета/NUMA-узла), а cost threshold — 25–50.",
-				"EXEC sys.sp_configure N'show advanced options', 1; RECONFIGURE;\n"+
-					"EXEC sys.sp_configure N'max degree of parallelism', 8; RECONFIGURE;"))
-		} else if cur > float64(cpuCount) {
-			F = append(F, finding("DOP-02", "warning", "Параллелизм",
-				"MAXDOP больше числа ядер",
-				[]string{fmt.Sprintf("MAXDOP = %d, ядер: %d", int(cur), cpuCount)},
-				"Значение превышает физически доступные ядра и не даёт преимущества.",
-				"Установите MAXDOP не больше числа ядер одного NUMA-узла.",
-				"EXEC sys.sp_configure N'max degree of parallelism', 8; RECONFIGURE;"))
+	if m := cfg["max degree of parallelism"]; m != nil {
+		if cur, ok := gf(m, "value_in_use"); ok && (cur == 0 || cur == 1 || (cpuCount > 0 && cur > float64(cpuCount))) {
+			F = append(F, finding("DOP-01", "info", "Параллелизм", "MAXDOP: проверьте соответствие профилю нагрузки",
+				[]string{fmt.Sprintf("MAXDOP = %.0f; логических CPU = %d", cur, cpuCount), "Профиль: " + workloadName(d.Workload), "Источник: " + articleOperation},
+				"0 не ограничивает параллелизм настройкой, 1 отключает его; ни одно значение само по себе не доказывает проблему.", workloadAdvice(d.Workload)+parallelAdvice, ""))
 		}
 	}
 	if m := cfg["cost threshold for parallelism"]; m != nil {
-		cur, _ := gf(m, "value_in_use")
-		if cur <= 5 {
-			F = append(F, finding("DOP-03", "info", "Параллелизм",
-				fmt.Sprintf("Cost threshold for parallelism = %d (значение по умолчанию)",
-					int(cur)),
-				[]string{"Даже дешёвые запросы выполняются параллельно"},
-				"Значение 5 (по умолчанию с SQL 7.0) слишком мало для современного железа: "+
-					"мелкие запросы запускаются параллельно, создавая лишние CXPACKET-ожидания.",
-				"Увеличьте порог до 25–50 и наблюдайте за CXPACKET.",
-				"EXEC sys.sp_configure N'show advanced options', 1; RECONFIGURE;\n"+
-					"EXEC sys.sp_configure N'cost threshold for parallelism', 25; RECONFIGURE;"))
+		if cur, ok := gf(m, "value_in_use"); ok && cur <= 5 {
+			F = append(F, finding("DOP-03", "info", "Параллелизм", "Низкий cost threshold: проверьте планы запросов",
+				[]string{fmt.Sprintf("cost threshold = %.0f", cur), "Источник: " + articleOperation},
+				"Низкий порог может допускать параллельные планы лёгких запросов; это не измеренное доказательство избыточного параллелизма.", workloadAdvice(d.Workload)+parallelAdvice, ""))
 		}
 	}
 
@@ -243,8 +199,7 @@ func BuildFindings(d *DeepData, samples []Sample, blocking []BlockingEvent,
 						[]string{topStr},
 						"Транзакции ждут друг друга — пользовательские запросы «тормозят» "+
 							"из-за конкуренции за строки/таблицы.",
-						"Включите RCSI для проблемных баз, сократите транзакции, проверьте "+
-							"индексы у DML-операций и блокирующие цепочки в отчёте.", ""))
+						rcsiAdvice+" Проверьте блокирующие цепочки, индексы и длительность транзакций.", ""))
 				case "cpu":
 					if !has("WAIT-CPU") {
 						F = append(F, finding("WAIT-CPU", "warning", "CPU",
@@ -313,13 +268,11 @@ func BuildFindings(d *DeepData, samples []Sample, blocking []BlockingEvent,
 			}
 		}
 		if below >= max(3, len(ples)/10) {
-			F = append(F, finding("MEM-PRESS", "warning", "Память",
+			F = append(F, finding("MEM-PRESS", "info", "Память",
 				fmt.Sprintf("Page life expectancy регулярно ниже 300 с (минимум %.0f)", mn),
 				[]string{fmt.Sprintf("Точек с PLE<300: %d из %d", below, len(ples))},
-				"Страницы данных слишком быстро покидают буферный пул — данных больше, чем "+
-					"помещается в память. Отсюда лишние дисковые чтения.",
-				"Увеличьте память/max server memory, сократите лишние сканирования "+
-					"(индексы, статистика).", ""))
+				"300 с — диагностическая эвристика, не универсальный норматив PLE. Одного PLE недостаточно для вывода о нехватке памяти.",
+				"Сравните с эталонным периодом той же системы и NUMA-узлов; сопоставьте падение PLE с lazy writes, физическими чтениями и PAGEIOLATCH. Сначала проверьте планы/сканы, лимит памяти и ballooning, затем решайте вопрос расширения ОЗУ.", ""))
 		}
 	}
 	if len(lazy) > 0 {
@@ -364,11 +317,7 @@ func BuildFindings(d *DeepData, samples []Sample, blocking []BlockingEvent,
 				fmt.Sprintf("Худшая: сессия %s блокировала %d других сессий", worstKey, worstCnt)},
 			"Одни сессии удерживали блокировки, другие ждали. Это прямая причина "+
 				"«зависаний» запросов у пользователей.",
-			"1) Найдите виновника в разделе «Активные сессии и блокировки» (текст запроса "+
-				"приложен). 2) Сократите его транзакцию. 3) Для баз с частыми блокировками "+
-				"включите RCSI.",
-			"-- Включение RCSI (по одной базе, после проверки):\n"+
-				"ALTER DATABASE [YourDB] SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE;"))
+			"Найдите виновника в разделе активных сессий, сократите транзакции и проверьте индексы. "+rcsiAdvice, ""))
 	} else if d.Live != nil && len(d.Live.Blockers) > 0 {
 		var ids []string
 		for _, b := range d.Live.Blockers {
@@ -411,8 +360,7 @@ func BuildFindings(d *DeepData, samples []Sample, blocking []BlockingEvent,
 				"Две сессии блокируют друг друга, одна откатывается. Чаще всего причина — "+
 					"разный порядок доступа к таблицам или отсутствие подходящих индексов.",
 				"1) Выровняйте порядок доступа к таблицам в приложении. 2) Проверьте "+
-					"индексы по условиям конфликтных запросов. 3) Рассмотрите RCSI — "+
-					"устраняет большинство deadlock-ов чтения/записи.", ""))
+					"индексы по условиям конфликтных запросов. "+rcsiAdvice, ""))
 		}
 	}
 
@@ -628,10 +576,10 @@ func BuildFindings(d *DeepData, samples []Sample, blocking []BlockingEvent,
 			if gii(dbm, "is_system") == 1 {
 				continue
 			}
-			if gii(dbm, "compatibility_level") < 130 {
+			if v, ok := gi(dbm, "compatibility_level"); ok && v < 130 {
 				compat = append(compat, dbm)
 			}
-			if gs(dbm, "page_verify_option_desc") != "CHECKSUM" {
+			if v := gs(dbm, "page_verify_option_desc"); v != "" && v != "CHECKSUM" {
 				verify = append(verify, dbm)
 			}
 			if gii(dbm, "is_auto_shrink_on") == 1 {
@@ -759,8 +707,7 @@ func BuildFindings(d *DeepData, samples []Sample, blocking []BlockingEvent,
 							[]string{"Последняя полная копия: " +
 								strHead(gs(b, "last_full"), 19)},
 							"Без бэкапов журнала файл .ldf растёт бесконечно и не усекается.",
-							"Настройте регулярные бэкапы журнала транзакций (каждые 15–60 "+
-								"минут).", ""))
+							"Проверьте доступную историю msdb, внешнее резервирование и расписание бэкапов журнала по RPO. Не переключайте FULL в SIMPLE и не делайте аварийный shrink вместо устранения причины.", ""))
 					}
 				}
 				break
@@ -834,17 +781,13 @@ func BuildFindings(d *DeepData, samples []Sample, blocking []BlockingEvent,
 				}
 				names = append(names, gs(f, "name"))
 			}
-			F = append(F, finding("TEMP-01", "warning", "tempdb",
+			F = append(F, finding("TEMP-01", "info", "tempdb",
 				fmt.Sprintf("Файлов данных tempdb: %d (ядер: %d)", dataFiles, cpuCount),
 				[]string{"Файлы: " + strings.Join(names, ", ")},
-				"При конкурентном доступе возникают конфликты за системные страницы "+
-					"(PAGELATCH_UP на 2:1:*), что замедляет все сортировки и временные "+
-					"таблицы.",
+				"Это меньше стартового ориентира min(8, CPU), но ещё не доказательство конфликтов. Проверьте PAGELATCH и страницы распределения tempdb.",
 				"Создайте по одному файлу данных на ядро (до 8) одинакового размера с "+
 					"одинаковым автоприращением.",
-				"ALTER DATABASE tempdb ADD FILE ( NAME = N'tempdev2', "+
-					"FILENAME = N'X:\\tempdb\\tempdev2.ndf', SIZE = 8GB, "+
-					"FILEGROWTH = 512MB );"))
+				""))
 		}
 		if verMB := gfi(d.Tempdb.Space, "version_mb"); verMB > 1024 && len(d.Tempdb.SnapshotTR) > 0 {
 			tr := d.Tempdb.SnapshotTR[0]
@@ -988,7 +931,7 @@ func BuildFindings(d *DeepData, samples []Sample, blocking []BlockingEvent,
 		for _, f := range d.DBs.Files {
 			if gii(f, "is_percent_growth") == 1 {
 				pct = append(pct, f)
-			} else if gfi(f, "growth")*8 < 64 {
+			} else if gfi(f, "growth") > 0 && gfi(f, "growth")*8/1024 < 64 {
 				tiny = append(tiny, f)
 			}
 		}
@@ -1026,30 +969,7 @@ func BuildFindings(d *DeepData, samples []Sample, blocking []BlockingEvent,
 		}
 	}
 
-	// ---------- 25. Query Store ----------
-	var qsOff []map[string]any
-	for _, r := range d.QueryStore {
-		st := gs(r, "state")
-		if st != "READ_WRITE" && st != "READ_ONLY" {
-			qsOff = append(qsOff, r)
-		}
-	}
-	if len(qsOff) > 0 && len(d.QueryStore) > 0 {
-		var names []string
-		for i, r := range qsOff {
-			if i >= 6 {
-				break
-			}
-			names = append(names, gs(r, "db"))
-		}
-		F = append(F, finding("QS-01", "info", "Планы запросов",
-			fmt.Sprintf("Query Store выключен в %d базах", len(qsOff)),
-			[]string{"Базы: " + strings.Join(names, ", ")},
-			"Query Store хранит историю планов и статистику выполнения — незаменим для "+
-				"поиска регрессий производительности.",
-			fmt.Sprintf("ALTER DATABASE [%s] SET QUERY_STORE = ON;", gs(qsOff[0], "db")),
-			fmt.Sprintf("ALTER DATABASE [%s] SET QUERY_STORE = ON;", gs(qsOff[0], "db"))))
-	}
+	// Query Store state, including READ_ONLY, is checked by BuildAudit.
 
 	// ---------- 26. компиляции ----------
 	var comps, batchs []float64
@@ -1088,37 +1008,18 @@ func BuildFindings(d *DeepData, samples []Sample, blocking []BlockingEvent,
 		}
 	}
 
-	// ---------- 28. RCSI при блокировках ----------
-	if d.WaitStats != nil && len(d.WaitStats.Rows) > 0 {
-		cats := waitCategoryTotals(d.WaitStats.Rows)
-		tot := 0.0
-		for _, v := range cats {
-			tot += v
-		}
-		if tot > 0 && cats["lock"]/tot > 0.1 && d.DBs != nil {
-			var noRCSI []map[string]any
-			for _, dbm := range d.DBs.Databases {
-				if gii(dbm, "is_system") == 1 && gs(dbm, "name") != "tempdb" {
-					continue
-				}
-				if gii(dbm, "is_system") == 1 {
-					continue
-				}
-				if gii(dbm, "is_read_committed_snapshot_on") == 0 {
-					noRCSI = append(noRCSI, dbm)
-				}
+	// No automatic RCSI prescription from instance-wide waits: affected databases
+	// and the application isolation mode have to be verified first.
+	F = append(F, auditFindings(d)...)
+	for i := range F {
+		if strings.HasPrefix(F[i].ID, "WAIT-") {
+			scope := "Дельты ожиданий за наблюдаемый период"
+			if !measured {
+				scope = "Накопленные ожидания с перезапуска: не доказательство текущей проблемы"
+				F[i].Severity = "info"
 			}
-			if len(noRCSI) > 0 {
-				F = append(F, finding("RCSI-01", "info", "Блокировки",
-					"Доля lock-ожиданий >10%, RCSI не включён ни в одной базе",
-					[]string{fmt.Sprintf("Базы без RCSI: %d", len(noRCSI))},
-					"Изоляция фиксации чтения с моментальным снимком (RCSI) устраняет "+
-						"блокировки читателей писателями без изменения приложений.",
-					"Включите RCSI для баз с конфликтами чтение/запись (после проверки "+
-						"нагрузки на tempdb).",
-					fmt.Sprintf("ALTER DATABASE [%s] SET READ_COMMITTED_SNAPSHOT ON;",
-						gs(noRCSI[0], "name"))))
-			}
+			F[i].Evidence = append(F[i].Evidence, scope, "Источник: "+articleOperation)
+			F[i].Action += " Сопоставьте динамику с жалобами и эталонным спокойным периодом; ожидания сами по себе не ошибки."
 		}
 	}
 

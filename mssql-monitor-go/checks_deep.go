@@ -13,7 +13,7 @@ import (
 
 func collectDeep(db Querier, opts CheckOptions, progress func(string),
 	blocking []BlockingEvent, longq []LongQuery) *DeepData {
-	d := &DeepData{Errors: map[string]string{}, BlockingEvents: blocking, LongQueries: longq}
+	d := &DeepData{Workload: opts.Workload, Errors: map[string]string{}, BlockingEvents: blocking, LongQueries: longq}
 
 	safe := func(name string, fn func() error) {
 		if progress != nil {
@@ -104,6 +104,11 @@ func collectDeep(db Querier, opts CheckOptions, progress func(string),
 		d.Volumes = rows
 		return err
 	})
+	safe("file_volumes", func() error {
+		var err error
+		d.FileVolumes, err = db.Query("SELECT DB_NAME(mf.database_id) AS db, mf.type_desc, vs.volume_mount_point FROM sys.master_files mf CROSS APPLY sys.dm_os_volume_stats(mf.database_id, mf.file_id) vs")
+		return err
+	})
 	safe("tempdb", func() error { d.Tempdb = tempdbInfo(db); return nil })
 	safe("trace_flags", func() error {
 		rows, err := db.Query("DBCC TRACESTATUS(-1)")
@@ -192,8 +197,9 @@ func sysInfo(db Querier) map[string]any {
 		out["in_use_kb"] = row["in_use_kb"]
 		out["vas_kb"] = row["vas_kb"]
 	}
-	if rows, err := db.Query("SELECT servicename, startup_type_desc, status_desc, service_account " +
-		"FROM sys.dm_server_services"); err == nil {
+	if rows, err := queryAny(db, []string{
+		"SELECT servicename, startup_type_desc, status_desc, service_account, instant_file_initialization_enabled FROM sys.dm_server_services",
+		"SELECT servicename, startup_type_desc, status_desc, service_account FROM sys.dm_server_services"}); err == nil {
 		out["services"] = rows
 	}
 	return out
@@ -568,7 +574,7 @@ func databases(db Querier) (*DBsData, error) {
 			"d.compatibility_level, d.page_verify_option_desc, " +
 			"d.is_read_committed_snapshot_on, d.is_auto_shrink_on, d.is_auto_close_on, " +
 			"d.is_auto_create_stats_on, d.is_auto_update_stats_on, " +
-			"d.snapshot_isolation_state_desc, d.log_reuse_wait, " +
+			"d.snapshot_isolation_state_desc, d.log_reuse_wait, d.target_recovery_time_in_seconds, " +
 			"CAST(CASE WHEN d.database_id <= 4 THEN 1 ELSE 0 END AS INT) AS is_system " +
 			"FROM sys.databases d WHERE d.state_desc = N'ONLINE' ORDER BY d.database_id")
 	if err != nil {
@@ -618,7 +624,7 @@ func databases(db Querier) (*DBsData, error) {
 func tempdbInfo(db Querier) *TempdbData {
 	td := &TempdbData{}
 	td.Files, _ = db.Query("SELECT name, CAST(size AS BIGINT)*8/1024.0 AS size_mb, " +
-		"physical_name, type_desc FROM tempdb.sys.database_files")
+		"physical_name, type_desc, growth, is_percent_growth FROM tempdb.sys.database_files")
 	td.Space = queryRow(db, sqlTempDB)
 	if td.Space == nil {
 		td.Space = map[string]any{}
@@ -631,11 +637,14 @@ func tempdbInfo(db Querier) *TempdbData {
 
 func queryStore(db Querier) []map[string]any {
 	var out []map[string]any
-	for _, dbname := range firstN(userDBs(db), 80) {
+	for _, dbname := range userDBs(db) {
 		q := "SELECT actual_state_desc FROM " + qdb(dbname) + ".sys.database_query_store_options"
-		if row := queryRow(db, q); row != nil {
-			out = append(out, map[string]any{"db": dbname, "state": gs(row, "actual_state_desc")})
+		rows, err := db.Query(q)
+		state := ""
+		if err == nil && len(rows) > 0 {
+			state = gs(rows[0], "actual_state_desc")
 		}
+		out = append(out, map[string]any{"db": dbname, "state": state})
 	}
 	return out
 }

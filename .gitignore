@@ -23,3 +23,24 @@ go.work.sum
 
 # env file
 .env
+
+# Local runtime/test artifacts (reports in demo/ and release/ remain tracked)
+__pycache__/
+*.pyc
+mssql-monitor/data/
+mssql-monitor/logs/
+mssql-monitor/reports/
+mssql-monitor-go/data/
+mssql-monitor-go/logs/
+mssql-monitor-go/reports/
+.test-local.mod
+.test-local.sum
+
+# Host-specific settings and build scratch files do not belong in this repository
+.config/
+.sudo_as_admin_successful
+.venv*/
+**/build/
+**/dist/
+*.spec
+**/release/*.zip

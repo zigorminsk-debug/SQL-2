@@ -66,3 +66,15 @@ func (l *Logger) Since(seq int64) []LogLine {
 	}
 	return out
 }
+
+func (l *Logger) Close() {
+	if l == nil {
+		return
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.f != nil {
+		l.f.Close()
+		l.f = nil
+	}
+}

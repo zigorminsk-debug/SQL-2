@@ -340,7 +340,7 @@ func (d *DemoDatabase) Query(sql string) ([]map[string]any, error) {
 	if strings.Contains(U, "DM_SERVER_SERVICES") {
 		return []map[string]any{
 			{"servicename": "SQL Server (SQL2022)", "startup_type_desc": "Automatic",
-				"status_desc": "Running", "service_account": `NT Service\MSSQL$SQL2022`},
+				"status_desc": "Running", "instant_file_initialization_enabled": "N", "service_account": `NT Service\MSSQL$SQL2022`},
 			{"servicename": "SQL Server Agent (SQL2022)", "startup_type_desc": "Automatic",
 				"status_desc": "Running", "service_account": `NT Service\SQLAgent$SQL2022`},
 			{"servicename": "SQL Server Browser", "startup_type_desc": "Disabled",
@@ -462,14 +462,15 @@ func (d *DemoDatabase) Query(sql string) ([]map[string]any, error) {
 			return map[string]any{"name": name, "state_desc": state,
 				"recovery_model_desc": recovery, "log_reuse_wait_desc": reuse,
 				"compatibility_level": float64(compat), "page_verify_option_desc": verify,
-				"is_read_committed_snapshot_on": float64(rcsi),
-				"is_auto_shrink_on":             float64(shrink),
-				"is_auto_close_on":              float64(autoclose),
-				"is_auto_create_stats_on":       float64(1),
-				"is_auto_update_stats_on":       float64(1),
-				"snapshot_isolation_state_desc": map[int]string{1: "ON", 0: "OFF"}[snapshot],
-				"log_reuse_wait":                float64(map[string]int{"NOTHING": 0, "LOG_BACKUP": 2}[reuse]),
-				"is_system":                     float64(isSys)}
+				"is_read_committed_snapshot_on":   float64(rcsi),
+				"is_auto_shrink_on":               float64(shrink),
+				"is_auto_close_on":                float64(autoclose),
+				"is_auto_create_stats_on":         float64(1),
+				"is_auto_update_stats_on":         float64(1),
+				"target_recovery_time_in_seconds": float64(map[bool]int{true: 0, false: 60}[name == "SalesDB"]),
+				"snapshot_isolation_state_desc":   map[int]string{1: "ON", 0: "OFF"}[snapshot],
+				"log_reuse_wait":                  float64(map[string]int{"NOTHING": 0, "LOG_BACKUP": 2}[reuse]),
+				"is_system":                       float64(isSys)}
 		}
 		return []map[string]any{
 			dbRow("master", "ONLINE", "SIMPLE", "NOTHING", 160, "CHECKSUM", 1, 0, 0, 1, 1),
@@ -528,6 +529,14 @@ func (d *DemoDatabase) Query(sql string) ([]map[string]any, error) {
 		}
 		return []map[string]any{{"vlf": v}}, nil
 	}
+	if strings.Contains(U, "DM_OS_VOLUME_STATS") && strings.Contains(U, "DB_NAME(MF.DATABASE_ID)") {
+		return []map[string]any{
+			{"db": "SalesDB", "type_desc": "ROWS", "volume_mount_point": `E:\`},
+			{"db": "SalesDB", "type_desc": "LOG", "volume_mount_point": `F:\`},
+			{"db": "ReportDB", "type_desc": "ROWS", "volume_mount_point": `D:\`},
+			{"db": "tempdb", "type_desc": "ROWS", "volume_mount_point": `D:\`},
+		}, nil
+	}
 	if strings.Contains(U, "DM_OS_VOLUME_STATS") {
 		return []map[string]any{
 			{"volume_mount_point": `C:\`, "file_system_type": "NTFS",
@@ -545,7 +554,7 @@ func (d *DemoDatabase) Query(sql string) ([]map[string]any, error) {
 	if strings.Contains(U, "TEMPDB.SYS.DATABASE_FILES") {
 		return []map[string]any{
 			{"name": "tempdev", "size_mb": 8192.0,
-				"physical_name": `D:\TempDB\tempdev.mdf`, "type_desc": "ROWS"},
+				"physical_name": `D:\TempDB\tempdev.mdf`, "type_desc": "ROWS", "growth": 8192.0, "is_percent_growth": 0.0},
 			{"name": "templog", "size_mb": 2048.0,
 				"physical_name": `D:\TempDB\templog.ldf`, "type_desc": "LOG"},
 		}, nil
